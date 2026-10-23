@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TALLY — 録画スタジオ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #14151a;
+    --bg-2: #0f1014;
+    --panel: #1b1d24;
+    --panel-2: #21232c;
+    --border: #33353f;
+    --text: #e8e6e1;
+    --muted: #8a8d98;
+    --rec: #ff3b30;
+    --rec-dim: #5a1a17;
+    --teal: #4dd9c4;
+    --amber: #ffb454;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(1200px 800px at 80% -10%, #1a1d26 0%, var(--bg) 55%, var(--bg-2) 100%);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height:100vh;
+    padding: 28px 20px 60px;
+  }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  .app{ max-width: 1180px; margin: 0 auto; }
+
+  header.top{
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:1px solid var(--border);
+    padding-bottom:16px; margin-bottom:24px;
+    flex-wrap: wrap; gap:8px;
+  }
+  header.top .brand{ display:flex; align-items:baseline; gap:12px; }
+  header.top .brand .dot{
+    width:10px;height:10px;border-radius:50%;
+    background: var(--teal); display:inline-block; flex-shrink:0;
+    box-shadow: 0 0 8px var(--teal);
+  }
+  header.top h1{
+    font-size:22px; letter-spacing:0.14em; margin:0; font-weight:700;
+  }
+  header.top .eyebrow{
+    color:var(--muted); font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+    font-family:'JetBrains Mono',monospace;
+  }
+  header.top .support-note{
+    font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace;
+    text-align:right; max-width:320px; line-height:1.6;
+  }
+
+  .banner{
+    background: #2a1616; border:1px solid #5a2a26; color:#ffb4ac;
+    padding:10px 14px; border-radius:6px; font-size:13px; margin-bottom:18px;
+    display:none;
+  }
+  .banner.show{ display:block; }
+
+  main.layout{
+    display:grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 22px;
+  }
+  @media (max-width: 860px){
+    main.layout{ grid-template-columns: 1fr; }
+  }
+
+  /* ---- Monitor (signature element) ---- */
+  .monitor-wrap{
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px;
+  }
+  .monitor{
+    position:relative;
+    aspect-ratio: 16/9;
+    background:#000;
+    border-radius:6px;
+    overflow:hidden;
+    border:1px solid #000;
+    outline: 1px solid #2a2c34;
+  }
+  .monitor.live{ outline-color: rgba(255,59,48,0.35); }
+  .monitor video, .monitor canvas{
+    width:100%; height:100%; object-fit:contain; display:block; background:#000;
+  }
+  .monitor .placeholder{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color: var(--muted); font-size:13px; text-align:center; padding:20px;
+    font-family:'JetBrains Mono',monospace; letter-spacing:0.03em;
+  }
+  .bracket{ position:absolute; width:22px; height:22px; pointer-events:none; }
+  .bracket.tl{ top:10px; left:10px; border-top:2px solid var(--teal); border-left:2px solid var(--teal); }
+  .bracket.tr{ top:10px; right:10px; border-top:2px solid var(--teal); border-right:2px solid var(--teal); }
+  .bracket.bl{ bottom:10px; left:10px; border-bottom:2px solid var(--teal); border-left:2px solid var(--teal); }
+  .bracket.br{ bottom:10px; right:10px; border-bottom:2px solid var(--teal); border-right:2px solid var(--teal); }
+
+  .hud-tally{
+    position:absolute; top:10px; right:44px;
+    display:flex; align-items:center; gap:6px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em;
+    color:#ffb4ac; opacity:0; transition: opacity .15s;
+  }
+  .hud-tally.on{ opacity:1; }
+  .hud-tally .tdot{
+    width:8px;height:8px;border-radius:50%; background:var(--rec);
+    animation: pulse 1s infinite ease-in-out;
+  }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.25;} }
+
+  .hud-timecode{
+    position:absolute; bottom:8px; left:44px;
+    font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.06em;
+    color: var(--text); background: rgba(0,0,0,0.45); padding:3px 8px; border-radius:3px;
+  }
+  .hud-readout{
+    position:absolute; bottom:8px; right:44px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.04em;
+    color: var(--teal); background: rgba(0,0,0,0.45); padding:3px 8px; border-radius:3px;
+  }
+  .flash{
+    position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none;
+    transition: opacity .08s ease-out;
+  }
+  .flash.go{ opacity:0.85; transition: opacity 0s; }
+
+  .meter-row{ display:flex; align-items:center; gap:10px; margin-top:12px; }
+  .meter-row .label{ font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; width:74px; flex-shrink:0; }
+  .meter-track{ flex:1; height:6px; background:var(--panel-2); border-radius:3px; overflow:hidden; border:1px solid var(--border); }
+  .meter-fill{ height:100%; width:0%; background: linear-gradient(90deg, var(--teal), var(--amber) 80%, var(--rec) 95%); transition: width .06s linear; }
+
+  .transport{ display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  button{
+    font-family:'Space Grotesk', sans-serif; font-weight:600; font-size:13px;
+    border-radius:6px; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--text); padding:10px 16px; cursor:pointer; letter-spacing:0.02em;
+    transition: background .15s, border-color .15s, opacity .15s;
+  }
+  button:hover:not(:disabled){ border-color: var(--teal); }
+  button:disabled{ opacity:0.35; cursor:not-allowed; }
+  button.primary{ background: var(--teal); color:#0b1210; border-color:var(--teal); }
+  button.primary:hover:not(:disabled){ filter:brightness(1.08); }
+  button.rec{ background: var(--rec); color:#fff; border-color:var(--rec); }
+  button.rec:hover:not(:disabled){ filter:brightness(1.08); }
+  button.ghost{ background:transparent; }
+
+  /* ---- Side panel ---- */
+  .panel{
+    background: var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:18px; display:flex; flex-direction:column; gap:18px;
+  }
+  .group label.title{
+    display:block; font-size:11px; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:8px; font-family:'JetBrains Mono',monospace;
+  }
+  .seg{ display:flex; gap:6px; }
+  .seg button{ flex:1; padding:9px 8px; font-size:12px; }
+  .seg button.active{ background: var(--teal); color:#0b1210; border-color:var(--teal); }
+
+  select{
+    width:100%; padding:9px 10px; border-radius:6px; border:1px solid var(--border);
+    background:var(--panel-2); color:var(--text); font-family:'JetBrains Mono',monospace; font-size:12.5px;
+  }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .cam-row{ display:flex; gap:8px; }
+  .cam-row select{ flex:1; }
+  .cam-row button{ padding:9px 12px; flex-shrink:0; }
+
+  .toggle-line{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid #26282f; }
+  .toggle-line:last-child{ border-bottom:none; }
+  .toggle-line span{ font-size:13px; }
+  .switch{ position:relative; width:38px; height:20px; flex-shrink:0; }
+  .switch input{ opacity:0; width:0; height:0; }
+  .slider{ position:absolute; inset:0; background:#3a3d47; border-radius:20px; cursor:pointer; transition:.15s; }
+  .slider:before{ content:""; position:absolute; width:14px; height:14px; left:3px; top:3px; background:#e8e6e1; border-radius:50%; transition:.15s; }
+  input:checked + .slider{ background: var(--teal); }
+  input:checked + .slider:before{ transform: translateX(18px); background:#0b1210; }
+  input:disabled + .slider{ opacity:.4; cursor:not-allowed; }
+
+  .note{ font-size:11px; color:var(--muted); line-height:1.6; font-family:'JetBrains Mono',monospace; }
+  .bitrate-est{ font-size:12px; color:var(--teal); font-family:'JetBrains Mono',monospace; }
+
+  /* ---- Clips ---- */
+  section.clips{ margin-top:24px; }
+  section.clips h2{
+    font-size:12px; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted);
+    font-family:'JetBrains Mono',monospace; margin: 0 0 12px; font-weight:500;
+  }
+  .clip-list{ display:flex; flex-direction:column; gap:8px; }
+  .clip{
+    display:flex; align-items:center; gap:14px; background:var(--panel);
+    border:1px solid var(--border); border-radius:8px; padding:10px 14px;
+  }
+  .clip .num{ font-family:'JetBrains Mono',monospace; color:var(--teal); font-size:12px; width:24px; }
+  .clip .meta{ flex:1; min-width:0; }
+  .clip .meta .name{ font-size:13px; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .clip .meta .sub{ font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+  .clip .actions{ display:flex; gap:8px; flex-shrink:0; }
+  .clip .actions a, .clip .actions button{ font-size:11px; padding:7px 12px; text-decoration:none; }
+  .empty{ color:var(--muted); font-size:12.5px; font-family:'JetBrains Mono',monospace; padding:14px 4px; }
+
+  video#hiddenScreen, video#hiddenWebcam{
+    position:absolute; width:2px; height:2px; opacity:0; pointer-events:none; top:0; left:0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <span class="dot"></span>
+      <div>
+        <h1>TALLY</h1>
+        <div class="eyebrow">Screen &amp; Camera Recorder</div>
+      </div>
+    </div>
+    <div class="support-note" id="supportNote">対応ブラウザ: Chrome / Edge 推奨（画面録画・4K以上・可変FPSに対応）</div>
+  </header>
+
+  <div class="banner" id="errorBanner"></div>
+
+  <main class="layout">
+    <!-- MONITOR -->
+    <div class="monitor-wrap">
+      <div class="monitor" id="monitor">
+        <div class="placeholder" id="placeholder">ソースを選んで「プレビュー開始」を押してください<br>Webカメラ / 画面共有 / 両方（ワイプ合成）</div>
+        <video id="previewVideo" autoplay muted playsinline style="display:none;"></video>
+        <canvas id="previewCanvas" style="display:none;"></canvas>
+
+        <div class="bracket tl"></div>
+        <div class="bracket tr"></div>
+        <div class="bracket bl"></div>
+        <div class="bracket br"></div>
+
+        <div class="hud-tally" id="hudTally"><span class="tdot"></span>REC</div>
+        <div class="hud-timecode mono" id="hudTimecode">00:00:00:00</div>
+        <div class="hud-readout mono" id="hudReadout">—</div>
+        <div class="flash" id="flash"></div>
+      </div>
+
+      <div class="meter-row">
+        <div class="label">音声レベル</div>
+        <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+      </div>
+
+      <div class="transport">
+        <button class="primary" id="btnPreview">プレビュー開始</button>
+        <button class="rec" id="btnRecord" disabled>● REC 開始</button>
+        <button id="btnPause" disabled>一時停止</button>
+        <button id="btnStop" disabled>■ 停止</button>
+        <button id="btnSnapshot" disabled>📷 静止画 (PNG)</button>
+        <button class="ghost" id="btnReset">リセット</button>
+      </div>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <div class="panel">
+      <div class="group">
+        <label class="title">ソース</label>
+        <div class="seg" id="sourceSeg">
+          <button data-mode="webcam" class="active">Webカメラ</button>
+          <button data-mode="screen">画面共有</button>
+          <button data-mode="both">両方（ワイプ）</button>
+        </div>
+      </div>
+
+      <div class="group" id="cameraGroup">
+        <label class="title">カメラ</label>
+        <div class="cam-row">
+          <select id="cameraSelect">
+            <option value="">既定のカメラ</option>
+          </select>
+          <button type="button" id="btnRefreshCams" class="ghost" title="カメラ一覧を更新">🔄</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <label class="title">解像度</label>
+        <select id="resSelect">
+          <option value="1280x720">HD (1280×720)</option>
+          <option value="1920x1080" selected>フルHD (1920×1080)</option>
+          <option value="2560x1440">2.5K (2560×1440)</option>
+          <option value="3840x2160">4K UHD (3840×2160)</option>
+          <option value="5120x2880">5K (5120×2880)</option>
+          <option value="7680x4320">8K UHD (7680×4320)</option>
+        </select>
+      </div>
+
+      <div class="row2">
+        <div class="group">
+          <label class="title">フレームレート</label>
+          <select id="fpsSelect">
+            <option value="24">24 fps</option>
+            <option value="30" selected>30 fps</option>
+            <option value="60">60 fps</option>
+            <option value="120">120 fps（対応時のみ）</option>
+          </select>
+        </div>
+        <div class="group">
+          <label class="title">推定ビットレート</label>
+          <div class="bitrate-est mono" id="bitrateEst" style="padding-top:9px;">—</div>
+        </div>
+      </div>
+
+      <div class="group">
+        <label class="title">保存形式</label>
+        <select id="formatSelect">
+          <option value="mp4" selected>MP4</option>
+          <option value="webm">WebM</option>
+        </select>
+        <div class="note" id="formatNote" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="group">
+        <label class="title">音声</label>
+        <div class="toggle-line">
+          <span>マイク音声</span>
+          <label class="switch"><input type="checkbox" id="micToggle"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-line">
+          <span>システム音声（画面共有時）</span>
+          <label class="switch"><input type="checkbox" id="sysToggle"><span class="slider"></span></label>
+        </div>
+      </div>
+
+      <div class="note">
+        ※ 実際に得られる解像度・fpsは、カメラ／ディスプレイ／OS／ブラウザの性能に依存するベストエフォートです。高解像度ほどビットレートが上がり、ファイルサイズが大きくなります。
+      </div>
+    </div>
+  </main>
+
+  <section class="clips">
+    <h2>録画クリップ</h2>
+    <div class="clip-list" id="clipList">
+      <div class="empty">まだ録画はありません。停止すると、ここにクリップが追加されます。</div>
+    </div>
+  </section>
+
+</div>
+
+<video id="hiddenScreen" autoplay muted playsinline></video>
+<video id="hiddenWebcam" autoplay muted playsinline></video>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  // ---- state ----
+  let mode = 'webcam';
+  let webcamStream = null, screenStream = null, micStream = null;
+  let finalStream = null;
+  let audioCtx = null, analyser = null, analyserData = null;
+  let compositing = false, rafId = null;
+  let mediaRecorder = null, recordedChunks = [];
+  let recording = false, paused = false;
+  let recStartTime = 0, pausedAccum = 0, pauseStart = 0;
+  let timerInterval = null, meterRaf = null;
+  let clipCounter = 0;
+
+  const previewVideo = $('previewVideo');
+  const previewCanvas = $('previewCanvas');
+  const hiddenScreen = $('hiddenScreen');
+  const hiddenWebcam = $('hiddenWebcam');
+  const placeholder = $('placeholder');
+  const monitorEl = $('monitor');
+  const errorBanner = $('errorBanner');
+
+  // ---- support check ----
+  const hasDisplayMedia = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+  if (!hasDisplayMedia) {
+    document.querySelectorAll('#sourceSeg button[data-mode="screen"], #sourceSeg button[data-mode="both"]').forEach(b => b.disabled = true);
+    $('supportNote').textContent = 'このブラウザは画面共有(getDisplayMedia)に対応していません。Webカメラ録画のみ利用できます。';
+  }
+
+  const MP4_CANDIDATES = [
+    'video/mp4;codecs=avc1.640028,mp4a.40.2',
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4'
+  ];
+  const WEBM_CANDIDATES = [
+    'video/webm;codecs=av01,opus',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm'
+  ];
+  const mp4Supported = !!(window.MediaRecorder && MP4_CANDIDATES.some(c => MediaRecorder.isTypeSupported(c)));
+  if (!mp4Supported) {
+    $('formatSelect').value = 'webm';
+    document.querySelector('#formatSelect option[value="mp4"]').disabled = true;
+    document.querySelector('#formatSelect option[value="mp4"]').textContent = 'MP4（このブラウザは非対応）';
+    $('formatNote').textContent = 'このブラウザはMP4での直接録画に対応していません。WebMで保存されます（多くのプレーヤーで再生可能です）。';
+  } else {
+    $('formatNote').textContent = 'MP4はChrome/Edgeの新しめのバージョンで直接録画できます。';
+  }
+
+  function showError(msg) {
+    errorBanner.textContent = msg;
+    errorBanner.classList.add('show');
+    setTimeout(() => errorBanner.classList.remove('show'), 6000);
+  }
+
+  // ---- source mode selector ----
+  document.querySelectorAll('#sourceSeg button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      document.querySelectorAll('#sourceSeg button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      $('sysToggle').disabled = (mode === 'webcam');
+      if (mode === 'webcam') $('sysToggle').checked = false;
+      updateCameraGroupVisibility();
+    });
+  });
+  $('sysToggle').disabled = false;
+
+  function updateCameraGroupVisibility() {
+    $('cameraGroup').style.display = (mode === 'webcam' || mode === 'both') ? 'block' : 'none';
+  }
+  updateCameraGroupVisibility();
+
+  // ---- camera device list ----
+  // Plain enumerateDevices() before/without a fresh permission grant often returns
+  // only one generic entry (privacy protection), which is why a newly plugged-in
+  // camera can show up as a blank label. To get real labels for *all* cameras we
+  // briefly open a throwaway video stream (which forces the browser to resolve
+  // device labels for everything currently connected), then close it immediately.
+  async function populateCameras(forcePermissionProbe) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      if (forcePermissionProbe) {
+        try {
+          const probe = await navigator.mediaDevices.getUserMedia({ video: true });
+          probe.getTracks().forEach(t => t.stop());
+        } catch (e) { /* user may deny; fall through and enumerate what we can */ }
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === 'videoinput');
+      const select = $('cameraSelect');
+      const prevValue = select.value;
+      select.innerHTML = '';
+      if (!cams.length) {
+        select.innerHTML = '<option value="">カメラが見つかりません</option>';
+        return;
+      }
+      const labelsMissing = cams.some(d => !d.label);
+      cams.forEach((d, i) => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `カメラ ${i + 1}（🔄で名前を取得）`;
+        select.appendChild(opt);
+      });
+      if (cams.some(d => d.deviceId === prevValue)) select.value = prevValue;
+      if (labelsMissing && !forcePermissionProbe) {
+        // labels not resolved yet — try once more with a permission probe
+        populateCameras(true);
+      }
+    } catch (e) { /* ignore */ }
+  }
+  populateCameras(false);
+
+  $('btnRefreshCams').addEventListener('click', () => populateCameras(true));
+
+  let deviceChangeTimer = null;
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => {
+      // debounce + give the OS a moment to finish initializing a newly plugged device
+      clearTimeout(deviceChangeTimer);
+      deviceChangeTimer = setTimeout(() => populateCameras(true), 600);
+    });
+  }
+
+  function getResolution() {
+    const [w, h] = $('resSelect').value.split('x').map(Number);
+    return [w, h];
+  }
+  function getFps() { return Number($('fpsSelect').value); }
+
+  function updateBitrateEstimate() {
+    const [w, h] = getResolution();
+    const fps = getFps();
+    const bps = estimateBitrate(w, h, fps);
+    $('bitrateEst').textContent = (bps / 1_000_000).toFixed(1) + ' Mbps';
+  }
+  function estimateBitrate(w, h, fps) {
+    const pixels = w * h;
+    const bpp = 0.08; // bits per pixel per frame, decent VP9 quality
+    let bitrate = pixels * fps * bpp;
+    return Math.min(Math.round(bitrate), 100_000_000);
+  }
+  $('resSelect').addEventListener('change', updateBitrateEstimate);
+  $('fpsSelect').addEventListener('change', updateBitrateEstimate);
+  updateBitrateEstimate();
+
+  function stopStream(s) { if (s) s.getTracks().forEach(t => t.stop()); }
+
+  function cleanupSources() {
+    stopStream(webcamStream); webcamStream = null;
+    stopStream(screenStream); screenStream = null;
+    stopStream(micStream); micStream = null;
+    compositing = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    if (audioCtx) { audioCtx.close().catch(()=>{}); audioCtx = null; }
+    if (meterRaf) cancelAnimationFrame(meterRaf);
+    hiddenScreen.srcObject = null;
+    hiddenWebcam.srcObject = null;
+    previewVideo.srcObject = null;
+  }
+
+  function setLockedControls(locked) {
+    $('resSelect').disabled = locked;
+    $('fpsSelect').disabled = locked;
+    $('formatSelect').disabled = locked;
+    $('cameraSelect').disabled = locked;
+    document.querySelectorAll('#sourceSeg button').forEach(b => b.disabled = locked || (!hasDisplayMedia && (b.dataset.mode !== 'webcam')));
+    $('micToggle').disabled = locked;
+    $('sysToggle').disabled = locked || (mode === 'webcam');
+  }
+
+  // ---- preview / source acquisition ----
+  $('btnPreview').addEventListener('click', async () => {
+    try {
+      await initSources();
+      await buildFinalStream();
+      placeholder.style.display = 'none';
+      $('btnPreview').disabled = true;
+      $('btnRecord').disabled = false;
+      $('btnReset').disabled = false;
+      $('btnSnapshot').disabled = false;
+      setLockedControls(true);
+      $('hudReadout').textContent = readoutText();
+    } catch (err) {
+      console.error(err);
+      showError('ソースの取得に失敗しました: ' + (err.message || err.name || err));
+      cleanupSources();
+    }
+  });
+
+  async function initSources() {
+    cleanupSources();
+    const [w, h] = getResolution();
+    const fps = getFps();
+    const videoConstraints = { width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: fps } };
+
+    if (mode === 'webcam' || mode === 'both') {
+      const camId = $('cameraSelect').value;
+      const camConstraints = Object.assign({}, videoConstraints);
+      if (camId) camConstraints.deviceId = { exact: camId };
+      webcamStream = await navigator.mediaDevices.getUserMedia({ video: camConstraints, audio: false });
+      populateCameras(); // labels become available once permission is granted
+    }
+    if (mode === 'screen' || mode === 'both') {
+      screenStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: $('sysToggle').checked });
+      screenStream.getVideoTracks()[0].addEventListener('ended', () => {
+        if (recording) stopRecording();
+        cleanupSources();
+        resetToIdle();
+      });
+    }
+    if ($('micToggle').checked) {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    }
+  }
+
+  async function buildFinalStream() {
+    finalStream = new MediaStream();
+
+    // video track
+    if (mode === 'webcam') {
+      previewVideo.style.display = 'block';
+      previewCanvas.style.display = 'none';
+      previewVideo.srcObject = webcamStream;
+      finalStream.addTrack(webcamStream.getVideoTracks()[0]);
+    } else if (mode === 'screen') {
+      previewVideo.style.display = 'block';
+      previewCanvas.style.display = 'none';
+      previewVideo.srcObject = screenStream;
+      finalStream.addTrack(screenStream.getVideoTracks()[0]);
+    } else if (mode === 'both') {
+      previewVideo.style.display = 'none';
+      previewCanvas.style.display = 'block';
+      hiddenScreen.srcObject = screenStream;
+      hiddenWebcam.srcObject = webcamStream;
+      await Promise.all([hiddenScreen.play().catch(()=>{}), hiddenWebcam.play().catch(()=>{})]);
+      const [w, h] = getResolution();
+      previewCanvas.width = w; previewCanvas.height = h;
+      compositing = true;
+      drawComposite();
+      const fps = getFps();
+      const canvasStream = previewCanvas.captureStream(fps);
+      finalStream.addTrack(canvasStream.getVideoTracks()[0]);
+    }
+
+    // audio mixing
+    const audioSources = [];
+    if (micStream && micStream.getAudioTracks().length) audioSources.push(micStream);
+    if (screenStream && screenStream.getAudioTracks().length) audioSources.push(new MediaStream([screenStream.getAudioTracks()[0]]));
+
+    if (audioSources.length) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const dest = audioCtx.createMediaStreamDestination();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      analyserData = new Uint8Array(analyser.frequencyBinCount);
+      audioSources.forEach(s => {
+        const src = audioCtx.createMediaStreamSource(s);
+        src.connect(dest);
+        src.connect(analyser);
+      });
+      dest.stream.getAudioTracks().forEach(t => finalStream.addTrack(t));
+      runMeter();
+    } else {
+      $('meterFill').style.width = '0%';
+    }
+
+    monitorEl.classList.remove('live');
+  }
+
+  function drawComposite() {
+    if (!compositing) return;
+    const ctx = previewCanvas.getContext('2d');
+    const cw = previewCanvas.width, ch = previewCanvas.height;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, cw, ch);
+    if (hiddenScreen.videoWidth) ctx.drawImage(hiddenScreen, 0, 0, cw, ch);
+
+    if (hiddenWebcam.videoWidth) {
+      const pipW = cw * 0.24;
+      const ratio = hiddenWebcam.videoHeight / hiddenWebcam.videoWidth || 0.5625;
+      const pipH = pipW * ratio;
+      const margin = cw * 0.02;
+      const px = cw - pipW - margin, py = ch - pipH - margin;
+      ctx.save();
+      ctx.strokeStyle = '#4dd9c4';
+      ctx.lineWidth = Math.max(2, cw * 0.003);
+      ctx.drawImage(hiddenWebcam, px, py, pipW, pipH);
+      ctx.strokeRect(px, py, pipW, pipH);
+      ctx.restore();
+    }
+    rafId = requestAnimationFrame(drawComposite);
+  }
+
+  function runMeter() {
+    if (!analyser) return;
+    analyser.getByteFrequencyData(analyserData);
+    let sum = 0;
+    for (let i = 0; i < analyserData.length; i++) sum += analyserData[i];
+    const avg = sum / analyserData.length;
+    $('meterFill').style.width = Math.min(100, (avg / 160) * 100) + '%';
+    meterRaf = requestAnimationFrame(runMeter);
+  }
+
+  function readoutText() {
+    const [w, h] = getResolution();
+    return `${w}×${h} / ${getFps()}fps / ${mode.toUpperCase()}`;
+  }
+
+  // ---- recording ----
+  function pickMimeType() {
+    const pref = $('formatSelect').value;
+    const order = (pref === 'mp4') ? MP4_CANDIDATES.concat(WEBM_CANDIDATES) : WEBM_CANDIDATES;
+    for (const c of order) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
+    }
+    return '';
+  }
+
+  $('btnRecord').addEventListener('click', () => {
+    if (!finalStream) return;
+    recordedChunks = [];
+    const mimeType = pickMimeType();
+    const [w, h] = getResolution();
+    const fps = getFps();
+    const options = { videoBitsPerSecond: estimateBitrate(w, h, fps) };
+    if (mimeType) options.mimeType = mimeType;
+
+    try {
+      mediaRecorder = new MediaRecorder(finalStream, options);
+    } catch (e) {
+      showError('この設定での録画開始に失敗しました。解像度／FPSを下げてお試しください。');
+      return;
+    }
+
+    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = onRecordingStop;
+    mediaRecorder.start(1000);
+
+    recording = true; paused = false;
+    recStartTime = performance.now();
+    pausedAccum = 0;
+    monitorEl.classList.add('live');
+    $('hudTally').classList.add('on');
+    startTimer();
+
+    $('btnRecord').disabled = true;
+    $('btnPause').disabled = false;
+    $('btnStop').disabled = false;
+    $('btnPreview').disabled = true;
+  });
+
+  $('btnPause').addEventListener('click', () => {
+    if (!mediaRecorder) return;
+    if (!paused) {
+      mediaRecorder.pause();
+      paused = true;
+      pauseStart = performance.now();
+      $('btnPause').textContent = '再開';
+      $('hudTally').classList.remove('on');
+    } else {
+      mediaRecorder.resume();
+      paused = false;
+      pausedAccum += performance.now() - pauseStart;
+      $('btnPause').textContent = '一時停止';
+      $('hudTally').classList.add('on');
+    }
+  });
+
+  $('btnStop').addEventListener('click', () => stopRecording());
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    recording = false; paused = false;
+    stopTimer();
+    monitorEl.classList.remove('live');
+    $('hudTally').classList.remove('on');
+    $('btnPause').textContent = '一時停止';
+    $('btnRecord').disabled = false;
+    $('btnPause').disabled = true;
+    $('btnStop').disabled = true;
+  }
+
+  function onRecordingStop() {
+    const mt = mediaRecorder.mimeType || 'video/webm';
+    const blob = new Blob(recordedChunks, { type: mt });
+    const url = URL.createObjectURL(blob);
+    clipCounter++;
+    const now = new Date();
+    const stamp = now.toISOString().replace(/[:T]/g, '-').slice(0, 19);
+    const ext = mt.includes('mp4') ? 'mp4' : 'webm';
+    const filename = `tally_${stamp}.${ext}`;
+    const durationMs = performance.now() - recStartTime - pausedAccum;
+    addClip({ url, filename, size: blob.size, durationMs, res: readoutText() });
+  }
+
+  function addClip(clip) {
+    const list = $('clipList');
+    const emptyMsg = list.querySelector('.empty');
+    if (emptyMsg) emptyMsg.remove();
+
+    const row = document.createElement('div');
+    row.className = 'clip';
+    row.innerHTML = `
+      <div class="num mono">${String(clipCounter).padStart(2, '0')}</div>
+      <div class="meta">
+        <div class="name">${clip.filename}</div>
+        <div class="sub">${clip.res} · ${formatDuration(clip.durationMs)} · ${formatBytes(clip.size)}</div>
+      </div>
+      <div class="actions">
+        <a href="${clip.url}" download="${clip.filename}"><button class="primary">保存</button></a>
+        <button class="ghost del">削除</button>
+      </div>
+    `;
+    row.querySelector('.del').addEventListener('click', () => {
+      URL.revokeObjectURL(clip.url);
+      row.remove();
+      if (!list.children.length) {
+        list.innerHTML = '<div class="empty">まだ録画はありません。停止すると、ここにクリップが追加されます。</div>';
+      }
+    });
+    list.prepend(row);
+  }
+
+  function formatBytes(b) {
+    if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB';
+    return (b / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+  function formatDuration(ms) {
+    const s = Math.max(0, Math.round(ms / 1000));
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  }
+
+  // ---- timer / timecode ----
+  function startTimer() {
+    stopTimer();
+    timerInterval = setInterval(() => {
+      if (paused) return;
+      const elapsed = performance.now() - recStartTime - pausedAccum;
+      $('hudTimecode').textContent = toTimecode(elapsed, getFps());
+    }, 40);
+  }
+  function stopTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  function toTimecode(ms, fps) {
+    const totalSec = ms / 1000;
+    const hh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+    const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+    const ss = String(Math.floor(totalSec % 60)).padStart(2, '0');
+    const ff = String(Math.floor((totalSec % 1) * fps)).padStart(2, '0');
+    return `${hh}:${mm}:${ss}:${ff}`;
+  }
+
+  // ---- reset ----
+  $('btnReset').addEventListener('click', () => resetToIdle());
+  function resetToIdle() {
+    if (recording) stopRecording();
+    cleanupSources();
+    finalStream = null;
+    previewVideo.style.display = 'none';
+    previewCanvas.style.display = 'none';
+    placeholder.style.display = 'flex';
+    $('hudTimecode').textContent = '00:00:00:00';
+    $('hudReadout').textContent = '—';
+    $('meterFill').style.width = '0%';
+    $('btnPreview').disabled = false;
+    $('btnRecord').disabled = true;
+    $('btnPause').disabled = true;
+    $('btnStop').disabled = true;
+    $('btnSnapshot').disabled = true;
+    $('btnReset').disabled = true;
+    setLockedControls(false);
+  }
+  $('btnReset').disabled = true;
+
+  // ---- snapshot (works live or during recording) ----
+  let snapshotCounter = 0;
+  $('btnSnapshot').addEventListener('click', () => captureSnapshot());
+
+  function captureSnapshot() {
+    const sourceEl = (mode === 'both') ? previewCanvas : previewVideo;
+    const w = (mode === 'both') ? previewCanvas.width : (previewVideo.videoWidth || previewVideo.clientWidth);
+    const h = (mode === 'both') ? previewCanvas.height : (previewVideo.videoHeight || previewVideo.clientHeight);
+    if (!w || !h) { showError('プレビューがまだ準備できていません。'); return; }
+
+    const shotCanvas = document.createElement('canvas');
+    shotCanvas.width = w;
+    shotCanvas.height = h;
+    const ctx = shotCanvas.getContext('2d');
+    ctx.drawImage(sourceEl, 0, 0, w, h);
+
+    shotCanvas.toBlob((blob) => {
+      if (!blob) { showError('静止画の書き出しに失敗しました。'); return; }
+      snapshotCounter++;
+      const now = new Date();
+      const stamp = now.toISOString().replace(/[:T]/g, '-').slice(0, 19);
+      const filename = `tally_snapshot_${stamp}.png`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }, 'image/png');
+
+    // shutter flash feedback
+    const flash = $('flash');
+    flash.classList.add('go');
+    requestAnimationFrame(() => {
+      flash.classList.remove('go');
+    });
+  }
+
+  window.addEventListener('beforeunload', () => cleanupSources());
+})();
+</script>
+</body>
+</html>
