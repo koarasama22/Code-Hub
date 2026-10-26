@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>画面を共有する</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+  body { font-family: sans-serif; max-width: 520px; margin: 40px auto; padding: 0 16px; text-align: center; }
+  #id-box { font-size: 28px; font-weight: bold; letter-spacing: 2px; background: #f2f2f2; padding: 16px; border-radius: 8px; margin: 16px 0; word-break: break-all; }
+  button { padding: 12px 24px; font-size: 16px; border-radius: 8px; border: none; background: #111; color: #fff; cursor: pointer; }
+  #status { color: #555; margin-top: 12px; }
+  video { width: 100%; margin-top: 16px; border-radius: 8px; background: #000; }
+</style>
+</head>
+<body>
+  <h1>画面を共有する</h1>
+  <p>「共有開始」を押して共有したい画面/ウィンドウを選んでください。</p>
+  <button id="startBtn">共有開始</button>
+
+  <div id="idArea" style="display:none">
+    <p>見る側の端末で、下のIDを入力してください：</p>
+    <div id="id-box">...</div>
+  </div>
+
+  <p id="status"></p>
+  <video id="preview" autoplay muted playsinline></video>
+
+  <script>
+    const startBtn = document.getElementById('startBtn');
+    const idArea = document.getElementById('idArea');
+    const idBox = document.getElementById('id-box');
+    const statusEl = document.getElementById('status');
+    const preview = document.getElementById('preview');
+
+    let localStream = null;
+
+    const peer = new Peer(); // PeerJSの無料クラウドブローカーを利用
+
+    peer.on('open', (id) => {
+      idBox.textContent = id;
+      idArea.style.display = 'block';
+      statusEl.textContent = '相手の接続を待っています…';
+    });
+
+    peer.on('error', (err) => {
+      statusEl.textContent = 'エラー: ' + err.type;
+      console.error(err);
+    });
+
+    peer.on('call', (call) => {
+      if (!localStream) {
+        statusEl.textContent = 'まだ画面共有を開始していません';
+        return;
+      }
+      call.answer(localStream);
+      statusEl.textContent = '接続されました。画面を送信中です。';
+    });
+
+    startBtn.addEventListener('click', async () => {
+      try {
+        localStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: 30 },
+          audio: false
+        });
+        preview.srcObject = localStream;
+        startBtn.disabled = true;
+        startBtn.textContent = '共有中';
+
+        localStream.getVideoTracks()[0].addEventListener('ended', () => {
+          statusEl.textContent = '共有が終了しました';
+          startBtn.disabled = false;
+          startBtn.textContent = '共有開始';
+        });
+      } catch (e) {
+        statusEl.textContent = '画面選択がキャンセルされました';
+      }
+    });
+  </script>
+</body>
+</html>
