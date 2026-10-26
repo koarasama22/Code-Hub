@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>暗号作成・解読</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs/qrcode.min.js"></script>
+<style>
+body {
+  background: linear-gradient(120deg, #fff, #c0f0ff);
+  color: #111;
+  font-family: "Noto Sans JP", sans-serif;
+  text-align: center;
+  padding: 40px;
+}
+h1 { color: #0077aa; margin-bottom: 20px; }
+textarea, input {
+  width: 90%;
+  font-size: 16px;
+  padding: 10px;
+  border-radius: 8px;
+  margin: 10px 0;
+  background: #fff;
+  color: #111;
+  border: 2px solid #0077aa;
+}
+button {
+  margin: 6px;
+  padding: 10px 18px;
+  font-size: 16px;
+  background: #0077aa;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:hover { background: #005f88; }
+#qrcode { margin-top: 20px; }
+#footer { margin-top: 30px; font-size: 13px; color: #555; }
+</style>
+</head>
+<body>
+<h1>暗号作成・解読</h1>
+
+<p>暗号キー（管理者にお尋ねください）:</p>
+<input type="text" id="key" placeholder="例：mykey123">
+
+<p>変換するテキスト:</p>
+<textarea id="input" rows="4"></textarea>
+
+<div>
+  <button onclick="runMode('encode')">🔒 暗号化</button>
+  <button onclick="runMode('decode')">🔓 解読</button>
+  <button onclick="clearAll()">クリア</button>
+</div>
+
+<p>結果:</p>
+<textarea id="output" rows="4" readonly></textarea>
+
+<div id="qrcode"></div>
+
+<div id="footer">© 2025 koarasama22's 上杉信号 完全版</div>
+
+<script>
+const validKeys = ["koarasama22","暗号","2025"];
+function encodeText(text,key=""){let encoded="";for(let i=0;i<text.length;i++){const code=text.codePointAt(i)+key.length*7;encoded+=Math.floor(code/100)+","+(code%100);if(i<text.length-1) encoded+=" ";if(code>0xffff) i++;}return encoded;}
+function decodeText(text,key=""){const pairs=text.trim().split(/\s+/);let decoded="";for(const pair of pairs){const [row,col]=pair.split(",").map(Number);const code=row*100+col-key.length*7;decoded+=String.fromCodePoint(code);}return decoded;}
+function isValidKey(key){ return validKeys.includes(key.trim()); }
+function runMode(mode){const input=document.getElementById("input").value;const key=document.getElementById("key").value;if(!input.trim()) return alert("テキストを入力してください。");if(!key.trim()) return alert("キーを入力してください。");if(!isValidKey(key)) return alert("🚫 無効なキーです");let output="";if(mode==="encode") output=encodeText(input,key);else output=decodeText(input,key);document.getElementById("output").value=output;if(mode==="encode") makeQR(output);else document.getElementById("qrcode").innerHTML="";}
+function makeQR(text){document.getElementById("qrcode").innerHTML="";new QRCode(document.getElementById("qrcode"),{text:text,width:200,height:200,colorDark:"#0077aa",colorLight:"#fff"});}
+function clearAll(){document.getElementById("input").value="";document.getElementById("output").value="";document.getElementById("qrcode").innerHTML="";document.getElementById("key").value="";}
+</script>
+</body>
+</html>
