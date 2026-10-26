@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple Music Player - シンプル音楽プレイヤー</title>
+<style>
+  :root {
+    --bg: #0f1218;
+    --panel: #171c26;
+    --panel-2: #1f2633;
+    --text: #e8ecf3;
+    --muted: #8b95a7;
+    --accent: #4fd1c5;
+    --accent-2: #7f9cf5;
+    --danger: #f56565;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  button, select, input { font: inherit; }
+
+  .player { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
+
+  .player-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .player-header h1 { font-size: 1.35rem; margin: 0; letter-spacing: .02em; }
+  .player-header h1 span { color: var(--accent); }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1px solid #2c3546;
+    background: var(--panel-2); color: var(--text); cursor: pointer; transition: background .15s, border-color .15s, transform .05s; user-select: none; }
+  .btn:hover { background: #283142; border-color: #3b475d; }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0b0f16; border: none; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger { color: var(--danger); }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .btn.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+  .drop-zone { border: 2px dashed #34405a; border-radius: var(--radius); padding: 22px 16px; text-align: center; background: var(--panel);
+    transition: border-color .15s, background .15s, padding .2s; }
+  .drop-zone.dragover { border-color: var(--accent); background: #1a2a2e; }
+  .drop-zone p { margin: 0 0 12px; color: var(--muted); }
+  .upload-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .status { margin-top: 12px !important; font-size: .9rem; min-height: 1.2em; color: var(--accent) !important; word-break: break-all; }
+  /* Compact state once tracks exist: free up space for the metronome / now-playing panels */
+  .drop-zone.has-tracks { padding: 10px 14px; border-style: solid; border-width: 1px; border-color: #243043; }
+  .drop-zone.has-tracks .drop-hint { display: none; }
+  .drop-zone.has-tracks .upload-buttons { justify-content: flex-start; gap: 8px; }
+  .drop-zone.has-tracks .btn { padding: 6px 10px; font-size: .82rem; }
+  .drop-zone.has-tracks .status:empty { margin-top: 6px !important; min-height: 0; }
+
+  .now-playing { margin-top: 16px; background: var(--panel); border-radius: var(--radius); padding: 14px; }
+  #spectrum { display: block; width: 100%; height: 180px; border-radius: 10px; background: #0b0e14; }
+  .track-title { margin-top: 12px; font-size: 1.05rem; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .track-sub { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 4px; min-height: 1.1em; }
+
+  .controls { margin-top: 12px; background: var(--panel); border-radius: var(--radius); padding: 14px; }
+  .seek-row { display: flex; align-items: center; gap: 10px; }
+  .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .85rem; min-width: 44px; text-align: center; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #2b3444; border-radius: 3px; outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 2px solid #0b0f16; }
+  input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #0b0f16; }
+
+  .button-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .icon-btn { width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; padding: 0; }
+  .icon-btn.big { width: 62px; height: 62px; font-size: 1.5rem; }
+
+  .option-row { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
+  .option { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .9rem; }
+  .option select { background: var(--panel-2); color: var(--text); border: 1px solid #2c3546; border-radius: 8px; padding: 6px 8px; }
+  .option input[type="range"] { width: 130px; }
+  .kbd-hint { margin-top: 12px; text-align: center; color: var(--muted); font-size: .75rem; }
+  kbd { background: #2b3444; padding: 1px 6px; border-radius: 4px; font-family: inherit; }
+
+  .metronome { margin-top: 12px; background: var(--panel); border-radius: var(--radius); padding: 18px 16px;
+    border: 2px solid #2f3b52; box-shadow: 0 0 0 1px rgba(79,209,197,.08); }
+  .metronome-header { color: var(--text); font-size: 1.1rem; font-weight: 700; margin-bottom: 14px; text-align: center; letter-spacing: .02em; }
+  .metronome-row { display: flex; align-items: center; justify-content: center; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .metronome-row .option { gap: 6px; }
+  .time-sep { color: var(--muted); }
+  #beats-select, #note-value-select, #advance-mode-select { background: var(--panel-2); color: var(--text); border: 1px solid #2c3546; border-radius: 8px; padding: 6px 6px; }
+  .program-label { text-align: center; color: var(--muted); font-size: .78rem; margin: 2px 0 10px; line-height: 1.5; }
+  .program-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .program-step { display: flex; align-items: center; gap: 6px; background: var(--panel-2); border: 1px solid #2c3546; border-radius: 8px; padding: 7px 10px; transition: border-color .15s; }
+  .program-step:focus-within { border-color: var(--accent); }
+  .program-step .step-num { color: var(--muted); font-size: .8rem; min-width: 16px; }
+  .step-bpm { width: 56px; background: transparent; color: var(--text); border: none; border-bottom: 1px solid #3a4558; text-align: center; padding: 2px 0; font-weight: 600; }
+  .step-bpm::placeholder { color: #566073; font-weight: 400; }
+  .step-sec-wrap { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+  .step-sec { width: 38px; background: transparent; color: var(--text); border: none; border-bottom: 1px solid #3a4558; text-align: center; padding: 2px 0; }
+  .step-sec-unit { color: var(--muted); font-size: .75rem; }
+  .program-steps.click-mode .step-sec-wrap { display: none; }
+  .program-status { text-align: center; color: var(--accent); font-size: .95rem; min-height: 1.3em; margin-bottom: 4px; font-weight: 600; }
+  .metronome .button-row { margin-top: 4px; }
+  .metronome .icon-btn.big { width: 70px; height: 70px; font-size: 1.6rem; }
+  #metro-play-btn:not(:disabled):hover { filter: brightness(1.1); }
+  .beat-dots { display: flex; justify-content: center; gap: 12px; margin: 10px 0 16px; flex-wrap: wrap; }
+  .beat-dot { width: 22px; height: 22px; border-radius: 50%; background: #2b3444; transition: background .04s, transform .06s, box-shadow .08s; }
+  .beat-dot.accent { box-shadow: 0 0 0 2px #4a5570 inset; }
+  .beat-dot.on { background: var(--accent-2); transform: scale(1.4); box-shadow: 0 0 14px 2px rgba(127,156,245,.8); }
+  .beat-dot.accent.on { background: var(--accent); box-shadow: 0 0 20px 4px rgba(79,209,197,.9); }
+
+  .playlist-section { margin-top: 12px; background: var(--panel); border-radius: var(--radius); padding: 14px; }
+  .playlist-header { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: .9rem; margin-bottom: 8px; }
+  .playlist { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+  .playlist li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+  .playlist li:hover { background: var(--panel-2); }
+  .playlist li.current { background: #1c3336; color: var(--accent); }
+  .playlist .idx { color: var(--muted); min-width: 26px; font-variant-numeric: tabular-nums; font-size: .85rem; }
+  .playlist .name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .playlist .path { color: var(--muted); font-size: .75rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 30%; }
+  .playlist .dur { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+  .playlist .remove { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+  .playlist .remove:hover { color: var(--danger); background: #2b1f24; }
+  .empty { color: var(--muted); text-align: center; padding: 18px 0; font-size: .9rem; }
+
+  .download-fab { position: fixed; right: 18px; bottom: 18px; z-index: 1000;
+    display: inline-flex; align-items: center; gap: 8px; padding: 13px 20px;
+    border-radius: 999px; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0b0f16; font-weight: 700; font-size: .95rem; text-decoration: none;
+    box-shadow: 0 8px 20px rgba(0,0,0,.4); transition: transform .08s, filter .15s; }
+  .download-fab:hover { filter: brightness(1.08); }
+  .download-fab:active { transform: scale(.96); }
+
+  @media (max-width: 520px) {
+    #spectrum { height: 130px; }
+    .icon-btn { width: 42px; height: 42px; }
+    .icon-btn.big { width: 56px; height: 56px; }
+    .playlist .path { display: none; }
+    .download-fab { right: 12px; bottom: 12px; padding: 11px 16px; font-size: .88rem; }
+  }
+</style>
+</head>
+<body>
+<main class="player">
+  <header class="player-header">
+    <h1>♪ Simple <span>Music Player</span></h1>
+  </header>
+
+  <section id="drop-zone" class="drop-zone" aria-label="音楽ファイルの追加">
+    <p class="drop-hint">ここに音楽ファイル / フォルダ / ZIPをドラッグ＆ドロップ（MP3のみ対応、ZIP内のMP3も可）</p>
+    <div class="upload-buttons">
+      <label class="btn primary" for="file-input">🎵 ファイル / ZIPを選択（複数可）</label>
+      <input type="file" id="file-input" multiple hidden
+             accept="audio/mpeg,.mp3,.zip,application/zip,application/x-zip-compressed">
+      <label class="btn" for="folder-input">📁 フォルダを選択</label>
+      <input type="file" id="folder-input" webkitdirectory directory multiple hidden>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="metronome" aria-label="メトロノーム">
+    <div class="metronome-header">🎼 メトロノーム</div>
+
+    <div class="metronome-row">
+      <label class="option">拍子
+        <select id="beats-select" aria-label="1小節の拍数">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4" selected>4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8">8</option>
+          <option value="9">9</option>
+          <option value="12">12</option>
+        </select>
+        <span class="time-sep">/</span>
+        <select id="note-value-select" aria-label="何分音符を1拍とするか">
+          <option value="2">2</option>
+          <option value="4" selected>4</option>
+          <option value="8">8</option>
+          <option value="16">16</option>
+        </select>
+      </label>
+      <label class="option">切替方法
+        <select id="advance-mode-select" aria-label="プログラムの切替方法">
+          <option value="time">時間で切替</option>
+          <option value="click">クリックで切替</option>
+        </select>
+      </label>
+      <button id="next-tempo-btn" class="btn" type="button" hidden>次のテンポへ ⏭</button>
+      <button id="tap-tempo-btn" class="btn" type="button" title="連続でタップしてテンポを計測">👆 タップでテンポ</button>
+    </div>
+
+    <div class="program-label">テンポ・プログラム（最大10ステップ。空欄はスキップ、1つだけならそのまま停止するまでループ。10番目の次は1番目に戻ります）</div>
+    <div id="program-steps" class="program-steps"></div>
+
+    <div id="program-status" class="program-status"></div>
+    <div id="beat-dots" class="beat-dots" aria-hidden="true"></div>
+
+    <div class="button-row">
+      <button id="metro-play-btn" class="btn icon-btn big primary" type="button" title="再生">▶</button>
+      <button id="metro-pause-btn" class="btn icon-btn big" type="button" title="一時停止" disabled>⏸</button>
+      <button id="metro-stop-btn" class="btn icon-btn big danger" type="button" title="停止" disabled>⏹</button>
+    </div>
+  </section>
+
+  <section class="now-playing" aria-label="再生中">
+    <canvas id="spectrum" aria-label="スペクトラム表示"></canvas>
+    <div id="track-title" class="track-title">曲が選択されていません</div>
+    <div id="track-sub" class="track-sub"></div>
+  </section>
+
+  <section class="controls" aria-label="再生コントロール">
+    <div class="seek-row">
+      <span id="current-time" class="time">0:00</span>
+      <input type="range" id="seek-bar" min="0" max="1000" value="0" step="1" aria-label="シークバー">
+      <span id="duration" class="time">0:00</span>
+    </div>
+
+    <div class="button-row">
+      <button id="prev-btn" class="btn icon-btn" type="button" title="前の曲">⏮</button>
+      <button id="play-btn" class="btn icon-btn big primary" type="button" title="再生 / 一時停止">▶</button>
+      <button id="next-btn" class="btn icon-btn" type="button" title="次の曲">⏭</button>
+      <button id="loop-btn" class="btn icon-btn" type="button" title="ループ: オフ">🔁</button>
+    </div>
+
+    <div class="option-row">
+      <label class="option">
+        <button id="mute-btn" class="btn icon-btn" type="button" title="ミュート" style="width:38px;height:38px;font-size:1rem;">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="80" aria-label="音量">
+        <span id="volume-value" class="time">80%</span>
+      </label>
+    </div>
+    <div class="kbd-hint"><kbd>Space</kbd> 再生/停止 &nbsp; <kbd>←</kbd><kbd>→</kbd> 5秒シーク &nbsp; <kbd>↑</kbd><kbd>↓</kbd> 音量</div>
+  </section>
+
+  <section class="playlist-section" aria-label="プレイリスト">
+    <div class="playlist-header">
+      <span>プレイリスト</span>
+      <span id="playlist-count">0 曲</span>
+      <button id="playlist-clear-btn" class="btn danger" type="button" hidden>🗑 すべて削除</button>
+    </div>
+    <ol id="playlist" class="playlist"></ol>
+  </section>
+</main>
+
+<!-- TODO: replace this href with the actual destination URL -->
+<a id="download-audio-btn" class="download-fab" href="https://example.com/" target="_blank" rel="noopener noreferrer">⬇ 音源をダウンロード</a>
+
+<audio id="audio" preload="metadata"></audio>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var AUDIO_EXT = ['mp3'];
+  var $ = function (id) { return document.getElementById(id); };
+  var audio = $('audio');
+  var fileInput = $('file-input');
+  var folderInput = $('folder-input');
+  var dropZone = $('drop-zone');
+  var statusEl = $('status');
+  var canvas = $('spectrum');
+  var ctx2d = canvas.getContext('2d');
+  var trackTitle = $('track-title');
+  var trackSub = $('track-sub');
+  var seekBar = $('seek-bar');
+  var currentTimeEl = $('current-time');
+  var durationEl = $('duration');
+  var playBtn = $('play-btn');
+  var prevBtn = $('prev-btn');
+  var nextBtn = $('next-btn');
+  var loopBtn = $('loop-btn');
+  var muteBtn = $('mute-btn');
+  var volumeSlider = $('volume-slider');
+  var volumeValue = $('volume-value');
+  var playlistEl = $('playlist');
+  var playlistCount = $('playlist-count');
+  var playlistClearBtn = $('playlist-clear-btn');
+  var tapTempoBtn = $('tap-tempo-btn');
+  var beatsSelect = $('beats-select');
+  var noteValueSelect = $('note-value-select');
+  var advanceModeSelect = $('advance-mode-select');
+  var programStepsEl = $('program-steps');
+  var nextTempoBtn = $('next-tempo-btn');
+  var programStatusEl = $('program-status');
+  var metroPlayBtn = $('metro-play-btn');
+  var metroPauseBtn = $('metro-pause-btn');
+  var metroStopBtn = $('metro-stop-btn');
+  var beatDotsEl = $('beat-dots');
+  var tracks = [];
+  var currentIndex = -1;
+  var loopMode = 'off';
+  var seeking = false;
+  var nextId = 1;
+  var audioCtx = null, analyser = null, sourceNode = null, freqData = null;
+  var autoplayBlocked = false;
+  function fmtTime(sec) {
+    if (!isFinite(sec) || sec < 0) return '0:00';
+    sec = Math.floor(sec);
+    var m = Math.floor(sec / 60), s = sec % 60;
+    var h = Math.floor(m / 60); m = m % 60;
+    var ss = (s < 10 ? '0' : '') + s;
+    return h > 0 ? h + ':' + (m < 10 ? '0' : '') + m + ':' + ss : m + ':' + ss;
+  }
+  function setStatus(msg) { statusEl.textContent = msg || ''; }
+  function extOf(name) { var i = name.lastIndexOf('.'); return i < 0 ? '' : name.slice(i + 1).toLowerCase(); }
+  function isAudioFile(file) {
+    if (extOf(file.name) === 'mp3') return true;
+    return file.type === 'audio/mpeg';
+  }
+  function baseName(name) { var i = name.lastIndexOf('.'); return i > 0 ? name.slice(0, i) : name; }
+  function addFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    var added = 0, skipped = 0;
+    files.sort(function (a, b) {
+      var pa = a.webkitRelativePath || a.name, pb = b.webkitRelativePath || b.name;
+      return pa.localeCompare(pb, 'ja', { numeric: true });
+    });
+    files.forEach(function (f) {
+      if (!isAudioFile(f)) { skipped++; return; }
+      var path = f.webkitRelativePath || f._relPath || '';
+      tracks.push({ id: nextId++, name: baseName(f.name), fileName: f.name, path: path, file: f, url: URL.createObjectURL(f), duration: NaN });
+      added++;
+    });
+    var msg = added + ' 曲を追加しました';
+    if (skipped) msg += '（' + skipped + ' 件スキップ: MP3以外は非対応）';
+    if (!added && !skipped) msg = '音楽ファイルが見つかりませんでした';
+    setStatus(msg);
+    renderPlaylist();
+    loadDurations();
+    if (currentIndex === -1 && tracks.length) { playIndex(0, false); }
+    return { added: added, skipped: skipped };
+  }
+  function isZipFile(file) {
+    return extOf(file.name) === 'zip' || file.type === 'application/zip' || file.type === 'application/x-zip-compressed';
+  }
+  async function extractZip(zipFile) {
+    var extracted = [];
+    if (typeof JSZip === 'undefined') {
+      setStatus('ZIP機能を読み込めませんでした（ネット接続を確認してください）');
+      return extracted;
+    }
+    try {
+      var zip = await JSZip.loadAsync(zipFile);
+      var names = Object.keys(zip.files);
+      for (var i = 0; i < names.length; i++) {
+        var entry = zip.files[names[i]];
+        if (entry.dir) continue;
+        var full = entry.name;
+        var base = full.split('/').pop();
+        if (!base || base.charAt(0) === '.' || full.indexOf('__MACOSX') !== -1) continue;
+        if (extOf(base) !== 'mp3') continue;
+        var blob = await entry.async('blob');
+        var f = new File([blob], base, { type: 'audio/mpeg' });
+        f._relPath = baseName(zipFile.name) + '/' + full;
+        extracted.push(f);
+      }
+    } catch (e) {
+      console.warn('ZIP解凍に失敗:', zipFile.name, e);
+      setStatus('ZIPファイルの解凍に失敗しました: ' + zipFile.name);
+    }
+    return extracted;
+  }
+  async function ingestFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    var zips = files.filter(isZipFile);
+    var rest = files.filter(function (f) { return !isZipFile(f); });
+    var combined = rest.slice();
+    if (zips.length) {
+      setStatus('ZIPを展開中...');
+      for (var i = 0; i < zips.length; i++) {
+        combined = combined.concat(await extractZip(zips[i]));
+      }
+    }
+    return addFiles(combined);
+  }
+  var durQueueRunning = 0;
+  function loadDurations() {
+    if (durQueueRunning >= 2) return;
+    var t = null;
+    for (var i = 0; i < tracks.length; i++) { if (tracks[i].duration !== tracks[i].duration && !tracks[i]._loading) { t = tracks[i]; break; } }
+    if (!t) return;
+    t._loading = true; durQueueRunning++;
+    var probe = document.createElement('audio');
+    probe.preload = 'metadata';
+    var done = function (ok) {
+      probe.onloadedmetadata = probe.onerror = null;
+      t.duration = ok && isFinite(probe.duration) ? probe.duration : -1;
+      probe.removeAttribute('src'); probe.load();
+      durQueueRunning--;
+      renderPlaylist();
+      loadDurations();
+    };
+    probe.onloadedmetadata = function () { done(true); };
+    probe.onerror = function () { done(false); };
+    probe.src = t.url;
+    if (durQueueRunning < 2) loadDurations();
+  }
+  function readAllEntries(reader) {
+    return new Promise(function (resolve, reject) {
+      var all = [];
+      (function batch() {
+        reader.readEntries(function (entries) {
+          if (!entries.length) { resolve(all); return; }
+          all = all.concat(entries); batch();
+        }, reject);
+      })();
+    });
+  }
+  function traverseEntry(entry, prefix) {
+    if (entry.isFile) {
+      return new Promise(function (resolve) {
+        entry.file(function (f) { try { f._relPath = prefix + f.name; } catch (e) {} resolve([f]); }, function () { resolve([]); });
+      });
+    }
+    if (entry.isDirectory) {
+      return readAllEntries(entry.createReader()).then(function (entries) {
+        return Promise.all(entries.map(function (en) { return traverseEntry(en, prefix + entry.name + '/'); }));
+      }).then(function (arrs) { return [].concat.apply([], arrs); });
+    }
+    return Promise.resolve([]);
+  }
+  async function handleDrop(e) {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    var dt = e.dataTransfer; if (!dt) return;
+    var items = dt.items;
+    var files = [];
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      var promises = [];
+      for (var i = 0; i < items.length; i++) {
+        var entry = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
+        if (entry) promises.push(traverseEntry(entry, ''));
+        else if (items[i].getAsFile) { var f = items[i].getAsFile(); if (f) promises.push(Promise.resolve([f])); }
+      }
+      setStatus('読み込み中...');
+      var arrs = await Promise.all(promises);
+      files = [].concat.apply([], arrs);
+    } else {
+      files = Array.prototype.slice.call(dt.files || []);
+    }
+    ingestFiles(files);
+  }
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    dropZone.addEventListener(ev, function (e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+    document.body.addEventListener(ev, function (e) { e.preventDefault(); });
+  });
+  dropZone.addEventListener('dragleave', function (e) { if (e.target === dropZone) dropZone.classList.remove('dragover'); });
+  dropZone.addEventListener('drop', handleDrop);
+  document.body.addEventListener('drop', function (e) { if (!dropZone.contains(e.target)) handleDrop(e); });
+
+  fileInput.addEventListener('change', function () { ingestFiles(fileInput.files); fileInput.value = ''; });
+  folderInput.addEventListener('change', function () { ingestFiles(folderInput.files); folderInput.value = ''; });
+
+  function clearAllTracks() {
+    stopPlayback();
+    tracks.forEach(function (t) { URL.revokeObjectURL(t.url); });
+    tracks = []; currentIndex = -1;
+    audio.removeAttribute('src'); audio.load();
+    trackTitle.textContent = '曲が選択されていません'; trackSub.textContent = '';
+    seekBar.value = 0; currentTimeEl.textContent = '0:00'; durationEl.textContent = '0:00';
+    renderPlaylist(); setStatus('プレイリストをクリアしました');
+  }
+  playlistClearBtn.addEventListener('click', clearAllTracks);
+
+  function renderPlaylist() {
+    playlistEl.innerHTML = '';
+    playlistCount.textContent = tracks.length + ' 曲';
+    dropZone.classList.toggle('has-tracks', tracks.length > 0);
+    playlistClearBtn.hidden = tracks.length === 0;
+    if (!tracks.length) {
+      var li = document.createElement('li'); li.className = 'empty'; li.style.cursor = 'default';
+      li.textContent = 'まだ曲がありません。上のボタンから音楽ファイルを追加してください。';
+      playlistEl.appendChild(li); return;
+    }
+    tracks.forEach(function (t, i) {
+      var li = document.createElement('li');
+      if (i === currentIndex) li.className = 'current';
+      li.dataset.index = i;
+      var idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = (i === currentIndex && !audio.paused) ? '▶' : (i + 1);
+      var name = document.createElement('span'); name.className = 'name'; name.textContent = t.name; name.title = t.fileName;
+      var path = document.createElement('span'); path.className = 'path';
+      var dir = t.path ? t.path.slice(0, t.path.lastIndexOf('/')) : ''; path.textContent = dir; path.title = dir;
+      var dur = document.createElement('span'); dur.className = 'dur'; dur.textContent = t.duration >= 0 ? fmtTime(t.duration) : (t.duration === -1 ? '--:--' : '…');
+      var rm = document.createElement('button'); rm.className = 'remove'; rm.type = 'button'; rm.title = '削除'; rm.textContent = '✕';
+      rm.addEventListener('click', function (e) { e.stopPropagation(); removeTrack(i); });
+      li.appendChild(idx); li.appendChild(name); li.appendChild(path); li.appendChild(dur); li.appendChild(rm);
+      li.addEventListener('click', function () { playIndex(i, true); });
+      playlistEl.appendChild(li);
+    });
+  }
+  function removeTrack(i) {
+    var t = tracks[i]; if (!t) return;
+    var wasCurrent = (i === currentIndex);
+    URL.revokeObjectURL(t.url);
+    tracks.splice(i, 1);
+    if (!tracks.length) { clearAllTracks(); return; }
+    if (wasCurrent) {
+      var playing = !audio.paused;
+      playIndex(Math.min(i, tracks.length - 1), playing);
+    } else if (i < currentIndex) { currentIndex--; }
+    renderPlaylist();
+  }
+  function ensureAudioGraph() {
+    if (audioCtx) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      audioCtx = new AC();
+      sourceNode = audioCtx.createMediaElementSource(audio);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
+      sourceNode.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+    } catch (e) { console.warn('AudioContext unavailable:', e); audioCtx = null; }
+  }
+  async function tryPlay() {
+    ensureAudioGraph();
+    if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume().catch(function () {}); }
+    try { await audio.play(); autoplayBlocked = false; }
+    catch (err) {
+      if (err && err.name === 'NotAllowedError') { autoplayBlocked = true; setStatus('▶ ボタンを押して再生を開始してください'); }
+      else if (err && err.name !== 'AbortError') { console.warn('play() failed:', err); setStatus('再生できませんでした: ' + (err.message || err.name)); }
+    }
+  }
+  async function playIndex(i, autoplay) {
+    if (!tracks.length) return;
+    if (autoplay === undefined) autoplay = true;
+    i = ((i % tracks.length) + tracks.length) % tracks.length;
+    currentIndex = i;
+    var t = tracks[i];
+    audio.src = t.url;
+    audio.loop = (loopMode === 'one');
+    audio.load();
+    trackTitle.textContent = t.name;
+    trackSub.textContent = (t.path ? t.path + ' • ' : '') + (t.file.type || extOf(t.fileName).toUpperCase()) + ' • ' + (t.file.size / 1024 / 1024).toFixed(2) + ' MB';
+    seekBar.value = 0; currentTimeEl.textContent = '0:00';
+    durationEl.textContent = t.duration >= 0 ? fmtTime(t.duration) : '0:00';
+    renderPlaylist();
+    if (autoplay) await tryPlay();
+  }
+  function stopPlayback() { audio.pause(); }
+  function advance(fromEnded) {
+    if (!tracks.length) return;
+    if (currentIndex + 1 >= tracks.length) {
+      if (fromEnded && loopMode !== 'all') { finishAll(); return; }
+      playIndex(0, true);
+    } else { playIndex(currentIndex + 1, true); }
+  }
+  function finishAll() {
+    audio.pause();
+    try { audio.currentTime = 0; } catch (e) {}
+    setStatus('プレイリストの再生が終了しました');
+    updatePlayButton();
+  }
+  function goPrev() {
+    if (!tracks.length) return;
+    if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+    playIndex(currentIndex - 1, true);
+  }
+  function togglePlay() {
+    if (!tracks.length) { setStatus('先に音楽ファイルを追加してください'); return; }
+    if (currentIndex === -1) { playIndex(0, true); return; }
+    if (audio.paused) tryPlay(); else audio.pause();
+  }
+  function updatePlayButton() {
+    var playing = !audio.paused && !audio.ended;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    playBtn.title = playing ? '一時停止' : '再生';
+    var cur = playlistEl.querySelector('li.current .idx');
+    if (cur) cur.textContent = playing ? '▶' : (currentIndex + 1);
+  }
+  function setLoopMode(mode) {
+    loopMode = mode;
+    audio.loop = (mode === 'one');
+    loopBtn.textContent = mode === 'one' ? '🔂' : '🔁';
+    loopBtn.classList.toggle('active', mode !== 'off');
+    loopBtn.title = 'ループ: ' + (mode === 'off' ? 'オフ' : mode === 'all' ? '全曲' : '1曲');
+    loopBtn.setAttribute('aria-pressed', mode !== 'off');
+  }
+  function setVolume(v) {
+    v = Math.max(0, Math.min(100, Math.round(v)));
+    audio.volume = v / 100;
+    volumeSlider.value = v; volumeValue.textContent = v + '%';
+    if (v > 0 && audio.muted) audio.muted = false;
+    updateMuteButton();
+  }
+  function updateMuteButton() {
+    var v = audio.volume;
+    muteBtn.textContent = (audio.muted || v === 0) ? '🔇' : v < 0.5 ? '🔉' : '🔊';
+    muteBtn.classList.toggle('active', audio.muted);
+  }
+
+  playBtn.addEventListener('click', togglePlay);
+  prevBtn.addEventListener('click', goPrev);
+  nextBtn.addEventListener('click', function () { advance(false); });
+  loopBtn.addEventListener('click', function () { setLoopMode(loopMode === 'off' ? 'all' : loopMode === 'all' ? 'one' : 'off'); });
+  volumeSlider.addEventListener('input', function () { setVolume(parseFloat(volumeSlider.value)); });
+  muteBtn.addEventListener('click', function () { audio.muted = !audio.muted; updateMuteButton(); });
+
+  seekBar.addEventListener('input', function () {
+    seeking = true;
+    if (isFinite(audio.duration)) currentTimeEl.textContent = fmtTime(seekBar.value / 1000 * audio.duration);
+  });
+  seekBar.addEventListener('change', function () {
+    if (isFinite(audio.duration)) audio.currentTime = seekBar.value / 1000 * audio.duration;
+    seeking = false;
+  });
+  audio.addEventListener('loadedmetadata', function () {
+    durationEl.textContent = fmtTime(audio.duration);
+    if (currentIndex >= 0 && tracks[currentIndex] && isFinite(audio.duration)) { tracks[currentIndex].duration = audio.duration; renderPlaylist(); }
+  });
+  audio.addEventListener('timeupdate', function () {
+    if (seeking || !isFinite(audio.duration) || audio.duration === 0) return;
+    seekBar.value = Math.round(audio.currentTime / audio.duration * 1000);
+    currentTimeEl.textContent = fmtTime(audio.currentTime);
+  });
+  audio.addEventListener('play', updatePlayButton);
+  audio.addEventListener('pause', updatePlayButton);
+  audio.addEventListener('ended', function () { if (loopMode !== 'one') advance(true); });
+  audio.addEventListener('error', function () {
+    var t = tracks[currentIndex];
+    setStatus('再生できないファイルです: ' + (t ? t.fileName : '') + '（ブラウザ非対応の形式の可能性があります）');
+  });
+  audio.addEventListener('volumechange', updateMuteButton);
+
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea' || tag === 'button') return;
+    if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+    else if (e.code === 'ArrowRight') { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5); }
+    else if (e.code === 'ArrowLeft') { audio.currentTime = Math.max(0, audio.currentTime - 5); }
+    else if (e.code === 'ArrowUp') { e.preventDefault(); setVolume(parseFloat(volumeSlider.value) + 5); }
+    else if (e.code === 'ArrowDown') { e.preventDefault(); setVolume(parseFloat(volumeSlider.value) - 5); }
+  });
+
+  // --- Metronome -----------------------------------------------------
+  // "Program" metronome: one or more tempos entered up front (comma-separated).
+  // A single value just runs forever at that tempo until Stop. Several values
+  // cycle through in order, switching either after a fixed duration or on a
+  // manual button click, chosen via advance-mode-select.
+  var metroCtx = null;
+  var metroRunning = false;          // scheduler actively posting clicks
+  var metroPaused = false;           // temporarily halted, state preserved
+  var metroTimerId = null;           // lookahead scheduler timer
+  var metroStepTimerId = null;       // time-based program-advance timer
+  var metroNextTime = 0;
+  var metroBeatIndex = 0;
+  var metroSteps = [{ bpm: 120, sec: 8 }];
+  var metroStepIndex = 0;
+  var METRO_LOOKAHEAD_MS = 25;
+  var METRO_SCHEDULE_AHEAD_SEC = 0.12;
+
+  var PROGRAM_STEP_COUNT = 10;
+  function clampBpm(v) {
+    if (!isFinite(v)) v = 120;
+    return Math.max(20, Math.min(300, Math.round(v)));
+  }
+  // Build 10 individually-editable program slots (BPM + its own duration). Blank
+  // BPM fields are skipped. Only step 1 is pre-filled, so by default the metronome
+  // is a plain single-tempo click until the person fills in more steps.
+  function buildProgramSteps() {
+    programStepsEl.innerHTML = '';
+    for (var i = 1; i <= PROGRAM_STEP_COUNT; i++) {
+      var row = document.createElement('div'); row.className = 'program-step';
+      var num = document.createElement('span'); num.className = 'step-num'; num.textContent = i + '.';
+      var bpm = document.createElement('input');
+      bpm.type = 'number'; bpm.className = 'step-bpm'; bpm.id = 'step-bpm-' + i;
+      bpm.min = 20; bpm.max = 300; bpm.step = 1; bpm.placeholder = 'BPM'; bpm.inputMode = 'numeric';
+      bpm.setAttribute('aria-label', 'ステップ' + i + ' テンポ（BPM）');
+      if (i === 1) bpm.value = 120;
+      var secWrap = document.createElement('span'); secWrap.className = 'step-sec-wrap';
+      var sec = document.createElement('input');
+      sec.type = 'number'; sec.className = 'step-sec'; sec.id = 'step-sec-' + i;
+      sec.min = 1; sec.max = 300; sec.step = 1; sec.value = 8; sec.inputMode = 'numeric';
+      sec.setAttribute('aria-label', 'ステップ' + i + ' 長さ（秒）');
+      var unit = document.createElement('span'); unit.className = 'step-sec-unit'; unit.textContent = '秒';
+      secWrap.appendChild(sec); secWrap.appendChild(unit);
+      row.appendChild(num); row.appendChild(bpm); row.appendChild(secWrap);
+      programStepsEl.appendChild(row);
+    }
+  }
+  buildProgramSteps();
+
+  function parseProgram() {
+    var steps = [];
+    for (var i = 1; i <= PROGRAM_STEP_COUNT; i++) {
+      var bpmEl = $('step-bpm-' + i), secEl = $('step-sec-' + i);
+      var bpmVal = bpmEl ? parseFloat(bpmEl.value) : NaN;
+      if (isFinite(bpmVal) && bpmVal > 0) {
+        var secVal = secEl ? parseFloat(secEl.value) : NaN;
+        steps.push({ bpm: clampBpm(bpmVal), sec: (isFinite(secVal) && secVal > 0) ? secVal : 8 });
+      }
+    }
+    return steps.length ? steps : [{ bpm: 120, sec: 8 }];
+  }
+
+  function renderBeatDots() {
+    var n = parseInt(beatsSelect.value, 10) || 4;
+    beatDotsEl.innerHTML = '';
+    for (var i = 0; i < n; i++) {
+      var d = document.createElement('span');
+      d.className = 'beat-dot' + (i === 0 ? ' accent' : '');
+      beatDotsEl.appendChild(d);
+    }
+  }
+  beatsSelect.addEventListener('change', renderBeatDots);
+  renderBeatDots();
+
+  function updateAdvanceModeUI() {
+    // Per-step duration only matters in "time" mode; in "click" mode advancing is
+    // manual, so the duration fields are hidden rather than just inert.
+    var mode = advanceModeSelect.value;
+    programStepsEl.classList.toggle('click-mode', mode === 'click');
+    nextTempoBtn.hidden = mode !== 'click';
+  }
+  advanceModeSelect.addEventListener('change', updateAdvanceModeUI);
+  updateAdvanceModeUI();
+
+  function updateProgramStatus() {
+    var step = metroSteps[metroStepIndex] || { bpm: 120 };
+    if (metroSteps.length > 1) {
+      programStatusEl.textContent = step.bpm + ' BPM （ステップ ' + (metroStepIndex + 1) + ' / ' + metroSteps.length + '）';
+    } else {
+      programStatusEl.textContent = step.bpm + ' BPM';
+    }
+  }
+
+  function flashBeat(i) {
+    var dots = beatDotsEl.children;
+    for (var k = 0; k < dots.length; k++) dots[k].classList.remove('on');
+    if (dots[i]) dots[i].classList.add('on');
+  }
+  function scheduleClick(beatIndex, time) {
+    // Beat 1 (the downbeat) gets a higher-pitched, punchier click than the rest.
+    // Extra emphasis: a quick downward pitch sweep gives each click a sharp, percussive "tock".
+    var isDownbeat = beatIndex === 0;
+    var osc = metroCtx.createOscillator();
+    var gain = metroCtx.createGain();
+    osc.type = 'square';
+    var f0 = isDownbeat ? 2200 : 1400;
+    var f1 = isDownbeat ? 900 : 650;
+    osc.frequency.setValueAtTime(f0, time);
+    osc.frequency.exponentialRampToValueAtTime(f1, time + (isDownbeat ? 0.05 : 0.03));
+    osc.connect(gain); gain.connect(metroCtx.destination);
+    var peak = isDownbeat ? 1.0 : 0.72;
+    var dur = isDownbeat ? 0.11 : 0.065;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(peak, time + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    osc.start(time);
+    osc.stop(time + dur + 0.02);
+    var delayMs = Math.max(0, (time - metroCtx.currentTime) * 1000);
+    setTimeout(function () { flashBeat(beatIndex); }, delayMs);
+  }
+  function metroScheduler() {
+    var beatsPerMeasure = parseInt(beatsSelect.value, 10) || 4;
+    var noteValue = parseInt(noteValueSelect.value, 10) || 4;
+    var bpm = clampBpm((metroSteps[metroStepIndex] && metroSteps[metroStepIndex].bpm) || 120);
+    var secPerBeat = (60 / bpm) * (4 / noteValue);
+    while (metroNextTime < metroCtx.currentTime + METRO_SCHEDULE_AHEAD_SEC) {
+      scheduleClick(metroBeatIndex, metroNextTime);
+      metroNextTime += secPerBeat;
+      metroBeatIndex = (metroBeatIndex + 1) % beatsPerMeasure;
+    }
+    updateProgramStatus();
+    metroTimerId = setTimeout(metroScheduler, METRO_LOOKAHEAD_MS);
+  }
+  function advanceStep() {
+    // Wraps from the last configured step back to the first (step 10 → step 1, or
+    // fewer if not all 10 slots are filled in).
+    if (metroSteps.length <= 1) return;
+    metroStepIndex = (metroStepIndex + 1) % metroSteps.length;
+    updateProgramStatus();
+  }
+  function scheduleStepAdvance() {
+    if (metroStepTimerId) { clearTimeout(metroStepTimerId); metroStepTimerId = null; }
+    if (advanceModeSelect.value !== 'time' || metroSteps.length <= 1) return;
+    var cur = metroSteps[metroStepIndex];
+    var sec = Math.max(1, (cur && cur.sec) || 8);
+    metroStepTimerId = setTimeout(function () {
+      advanceStep();
+      scheduleStepAdvance();
+    }, sec * 1000);
+  }
+  nextTempoBtn.addEventListener('click', advanceStep);
+
+  function setMetroButtons(state) {
+    // state: 'stopped' | 'running' | 'paused'
+    metroPlayBtn.disabled = state === 'running';
+    metroPlayBtn.textContent = state === 'paused' ? '▶' : '▶';
+    metroPlayBtn.title = state === 'paused' ? '再開' : '再生';
+    metroPauseBtn.disabled = state !== 'running';
+    metroStopBtn.disabled = state === 'stopped';
+    metroPlayBtn.classList.toggle('active', state === 'running');
+  }
+  function startMetronome() {
+    if (metroRunning) return;
+    if (!metroCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { setStatus('このブラウザはメトロノームに対応していません'); return; }
+      metroCtx = new AC();
+    }
+    if (metroCtx.state === 'suspended') metroCtx.resume().catch(function () {});
+    if (!metroPaused) {
+      // Fresh start (not resuming from pause): (re)read the tempo program.
+      metroSteps = parseProgram();
+      metroStepIndex = 0;
+      metroBeatIndex = 0;
+    }
+    metroPaused = false;
+    metroRunning = true;
+    metroNextTime = metroCtx.currentTime + 0.05;
+    metroScheduler();
+    scheduleStepAdvance();
+    setMetroButtons('running');
+    tapTempoBtn.hidden = true;
+  }
+  function pauseMetronome() {
+    if (!metroRunning) return;
+    metroRunning = false;
+    metroPaused = true;
+    if (metroTimerId) { clearTimeout(metroTimerId); metroTimerId = null; }
+    if (metroStepTimerId) { clearTimeout(metroStepTimerId); metroStepTimerId = null; }
+    setMetroButtons('paused');
+  }
+  function stopMetronome() {
+    metroRunning = false;
+    metroPaused = false;
+    if (metroTimerId) { clearTimeout(metroTimerId); metroTimerId = null; }
+    if (metroStepTimerId) { clearTimeout(metroStepTimerId); metroStepTimerId = null; }
+    metroStepIndex = 0;
+    metroBeatIndex = 0;
+    programStatusEl.textContent = '';
+    var dots = beatDotsEl.children;
+    for (var k = 0; k < dots.length; k++) dots[k].classList.remove('on');
+    setMetroButtons('stopped');
+    tapTempoBtn.hidden = false;
+  }
+  metroPlayBtn.addEventListener('click', startMetronome);
+  metroPauseBtn.addEventListener('click', pauseMetronome);
+  metroStopBtn.addEventListener('click', stopMetronome);
+  setMetroButtons('stopped');
+
+  // Tap tempo: tap the button a few times in rhythm; the average interval becomes the tempo.
+  var tapTimes = [];
+  tapTempoBtn.addEventListener('click', function () {
+    var now = performance.now();
+    if (tapTimes.length && now - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
+    tapTimes.push(now);
+    if (tapTimes.length > 8) tapTimes.shift();
+    if (tapTimes.length >= 2) {
+      var intervals = [];
+      for (var i = 1; i < tapTimes.length; i++) intervals.push(tapTimes[i] - tapTimes[i - 1]);
+      var avg = intervals.reduce(function (a, b) { return a + b; }, 0) / intervals.length;
+      var bpm = clampBpm(60000 / avg);
+      var step1 = $('step-bpm-1');
+      if (step1) step1.value = String(bpm);
+      setStatus('タップテンポ: ' + bpm + ' BPM');
+    } else {
+      setStatus('タップテンポ: もう一度タップしてください');
+    }
+  });
+
+  var BAR_COUNT = 64;
+  var smoothed = new Float32Array(BAR_COUNT);
+  var lastFrameTime = 0;
+  function resizeCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth || 600, h = canvas.clientHeight || 180;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    }
+  }
+  function drawSpectrum(now) {
+    requestAnimationFrame(drawSpectrum);
+    resizeCanvas();
+    var dt = lastFrameTime ? Math.min(1 / 15, (now - lastFrameTime) / 1000) : 1 / 60;
+    lastFrameTime = now;
+    var W = canvas.width, H = canvas.height;
+    ctx2d.clearRect(0, 0, W, H);
+    var active = analyser && !audio.paused;
+    if (active) analyser.getByteFrequencyData(freqData);
+    var usable = freqData ? Math.floor(freqData.length * 0.7) : 0;
+    var gap = W * 0.004, barW = (W - gap * (BAR_COUNT + 1)) / BAR_COUNT;
+    var grad = ctx2d.createLinearGradient(0, H, 0, 0);
+    grad.addColorStop(0, '#4fd1c5'); grad.addColorStop(0.6, '#7f9cf5'); grad.addColorStop(1, '#f687b3');
+    ctx2d.fillStyle = grad;
+    // Symmetric attack/release easing (framerate-independent) for a fluid, non-jittery motion.
+    var attackRate = 1 - Math.pow(0.001, dt);   // fast rise
+    var releaseRate = 1 - Math.pow(0.06, dt);   // gentle fall
+    for (var i = 0; i < BAR_COUNT; i++) {
+      var v = 0;
+      if (active && usable) {
+        var start = Math.floor(Math.pow(i / BAR_COUNT, 1.6) * usable);
+        var end = Math.max(start + 1, Math.floor(Math.pow((i + 1) / BAR_COUNT, 1.6) * usable));
+        var sum = 0; for (var k = start; k < end; k++) sum += freqData[k];
+        v = sum / (end - start) / 255;
+      }
+      var rate = v > smoothed[i] ? attackRate : releaseRate;
+      smoothed[i] += (v - smoothed[i]) * rate;
+      var bh = Math.max(2 * (window.devicePixelRatio || 1), smoothed[i] * (H - 8));
+      var x = gap + i * (barW + gap);
+      var r = Math.min(barW / 2, 4);
+      ctx2d.beginPath();
+      ctx2d.moveTo(x, H); ctx2d.lineTo(x, H - bh + r); ctx2d.quadraticCurveTo(x, H - bh, x + r, H - bh);
+      ctx2d.lineTo(x + barW - r, H - bh); ctx2d.quadraticCurveTo(x + barW, H - bh, x + barW, H - bh + r);
+      ctx2d.lineTo(x + barW, H); ctx2d.closePath(); ctx2d.fill();
+    }
+  }
+  requestAnimationFrame(drawSpectrum);
+
+  setVolume(80); setLoopMode('off'); renderPlaylist(); updatePlayButton();
+
+})();
+</script>
+</body>
+</html>
