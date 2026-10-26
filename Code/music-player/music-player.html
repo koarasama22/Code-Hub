@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple Music Player - シンプル音楽プレイヤー</title>
+<style>
+  :root {
+    --bg: #0f1218;
+    --panel: #171c26;
+    --panel-2: #1f2633;
+    --text: #e8ecf3;
+    --muted: #8b95a7;
+    --accent: #4fd1c5;
+    --accent-2: #7f9cf5;
+    --danger: #f56565;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  button, select, input { font: inherit; }
+
+  .player { max-width: 860px; margin: 0 auto; padding: 20px 16px 48px; }
+
+  .player-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .player-header h1 { font-size: 1.35rem; margin: 0; letter-spacing: .02em; }
+  .player-header h1 span { color: var(--accent); }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1px solid #2c3546;
+    background: var(--panel-2); color: var(--text); cursor: pointer; transition: background .15s, border-color .15s, transform .05s; user-select: none; }
+  .btn:hover { background: #283142; border-color: #3b475d; }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0b0f16; border: none; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger { color: var(--danger); }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; }
+  .btn.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+  .drop-zone { border: 2px dashed #34405a; border-radius: var(--radius); padding: 22px 16px; text-align: center; background: var(--panel);
+    transition: border-color .15s, background .15s; }
+  .drop-zone.dragover { border-color: var(--accent); background: #1a2a2e; }
+  .drop-zone p { margin: 0 0 12px; color: var(--muted); }
+  .upload-buttons { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .status { margin-top: 12px !important; font-size: .9rem; min-height: 1.2em; color: var(--accent) !important; word-break: break-all; }
+
+  .now-playing { margin-top: 16px; background: var(--panel); border-radius: var(--radius); padding: 14px; }
+  #spectrum { display: block; width: 100%; height: 180px; border-radius: 10px; background: #0b0e14; }
+  .track-title { margin-top: 12px; font-size: 1.05rem; font-weight: 600; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .track-sub { text-align: center; color: var(--muted); font-size: .85rem; margin-top: 4px; min-height: 1.1em; }
+
+  .controls { margin-top: 12px; background: var(--panel); border-radius: var(--radius); padding: 14px; }
+  .seek-row { display: flex; align-items: center; gap: 10px; }
+  .time { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .85rem; min-width: 44px; text-align: center; }
+  input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #2b3444; border-radius: 3px; outline: none; cursor: pointer; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 2px solid #0b0f16; }
+  input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid #0b0f16; }
+
+  .button-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .icon-btn { width: 46px; height: 46px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 1.15rem; padding: 0; }
+  .icon-btn.big { width: 62px; height: 62px; font-size: 1.5rem; }
+
+  .option-row { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
+  .option { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .9rem; }
+  .option select { background: var(--panel-2); color: var(--text); border: 1px solid #2c3546; border-radius: 8px; padding: 6px 8px; }
+  .option input[type="range"] { width: 130px; }
+  .kbd-hint { margin-top: 12px; text-align: center; color: var(--muted); font-size: .75rem; }
+  kbd { background: #2b3444; padding: 1px 6px; border-radius: 4px; font-family: inherit; }
+
+  .playlist-section { margin-top: 12px; background: var(--panel); border-radius: var(--radius); padding: 14px; }
+  .playlist-header { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: .9rem; margin-bottom: 8px; }
+  .playlist { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow-y: auto; }
+  .playlist li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; cursor: pointer; }
+  .playlist li:hover { background: var(--panel-2); }
+  .playlist li.current { background: #1c3336; color: var(--accent); }
+  .playlist .idx { color: var(--muted); min-width: 26px; font-variant-numeric: tabular-nums; font-size: .85rem; }
+  .playlist .name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .playlist .path { color: var(--muted); font-size: .75rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 30%; }
+  .playlist .dur { color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+  .playlist .remove { background: none; border: none; color: var(--muted); cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+  .playlist .remove:hover { color: var(--danger); background: #2b1f24; }
+  .empty { color: var(--muted); text-align: center; padding: 18px 0; font-size: .9rem; }
+
+  @media (max-width: 520px) {
+    #spectrum { height: 130px; }
+    .icon-btn { width: 42px; height: 42px; }
+    .icon-btn.big { width: 56px; height: 56px; }
+    .playlist .path { display: none; }
+  }
+</style>
+</head>
+<body>
+<main class="player">
+  <header class="player-header">
+    <h1>♪ Simple <span>Music Player</span></h1>
+  </header>
+
+  <section id="drop-zone" class="drop-zone" aria-label="音楽ファイルの追加">
+    <p>ここに音楽ファイル / フォルダをドラッグ＆ドロップ（MP3, WAV, OGG, FLAC, AAC, M4A など）</p>
+    <div class="upload-buttons">
+      <label class="btn primary" for="file-input">🎵 ファイルを選択（複数可）</label>
+      <input type="file" id="file-input" multiple hidden
+             accept="audio/*,.mp3,.wav,.wave,.ogg,.oga,.opus,.flac,.aac,.m4a,.m4b,.weba,.webm,.aiff,.aif,.aifc,.wma,.alac,.caf,.amr,.mp2,.mka">
+      <label class="btn" for="folder-input">📁 フォルダを選択</label>
+      <input type="file" id="folder-input" webkitdirectory directory multiple hidden>
+      <button id="clear-btn" class="btn danger" type="button">🗑 すべてクリア</button>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="now-playing" aria-label="再生中">
+    <canvas id="spectrum" aria-label="スペクトラム表示"></canvas>
+    <div id="track-title" class="track-title">曲が選択されていません</div>
+    <div id="track-sub" class="track-sub"></div>
+  </section>
+
+  <section class="controls" aria-label="再生コントロール">
+    <div class="seek-row">
+      <span id="current-time" class="time">0:00</span>
+      <input type="range" id="seek-bar" min="0" max="1000" value="0" step="1" aria-label="シークバー">
+      <span id="duration" class="time">0:00</span>
+    </div>
+
+    <div class="button-row">
+      <button id="shuffle-btn" class="btn icon-btn" type="button" title="ランダム再生" aria-pressed="false">🔀</button>
+      <button id="prev-btn" class="btn icon-btn" type="button" title="前の曲">⏮</button>
+      <button id="play-btn" class="btn icon-btn big primary" type="button" title="再生 / 一時停止">▶</button>
+      <button id="next-btn" class="btn icon-btn" type="button" title="次の曲">⏭</button>
+      <button id="loop-btn" class="btn icon-btn" type="button" title="ループ: オフ">🔁</button>
+    </div>
+
+    <div class="option-row">
+      <label class="option">速度
+        <select id="speed-select" aria-label="再生速度">
+          <option value="0.5">0.5x</option>
+          <option value="0.75">0.75x</option>
+          <option value="1" selected>1.0x</option>
+          <option value="1.25">1.25x</option>
+          <option value="1.5">1.5x</option>
+          <option value="1.75">1.75x</option>
+          <option value="2">2.0x</option>
+        </select>
+      </label>
+      <label class="option">
+        <button id="mute-btn" class="btn icon-btn" type="button" title="ミュート" style="width:38px;height:38px;font-size:1rem;">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="80" aria-label="音量">
+        <span id="volume-value" class="time">80%</span>
+      </label>
+    </div>
+    <div class="kbd-hint"><kbd>Space</kbd> 再生/停止 &nbsp; <kbd>←</kbd><kbd>→</kbd> 5秒シーク &nbsp; <kbd>↑</kbd><kbd>↓</kbd> 音量</div>
+  </section>
+
+  <section class="playlist-section" aria-label="プレイリスト">
+    <div class="playlist-header">
+      <span>プレイリスト</span>
+      <span id="playlist-count">0 曲</span>
+    </div>
+    <ol id="playlist" class="playlist"></ol>
+  </section>
+</main>
+
+<audio id="audio" preload="metadata"></audio>
+
+<script>
+(function () {
+  'use strict';
+  var AUDIO_EXT = ['mp3', 'wav', 'wave', 'ogg', 'oga', 'opus', 'flac', 'aac', 'm4a', 'm4b',
+                   'weba', 'webm', 'aiff', 'aif', 'aifc', 'wma', 'alac', 'caf', 'amr', 'mp2', 'mka'];
+  var $ = function (id) { return document.getElementById(id); };
+  var audio = $('audio');
+  var fileInput = $('file-input');
+  var folderInput = $('folder-input');
+  var dropZone = $('drop-zone');
+  var clearBtn = $('clear-btn');
+  var statusEl = $('status');
+  var canvas = $('spectrum');
+  var ctx2d = canvas.getContext('2d');
+  var trackTitle = $('track-title');
+  var trackSub = $('track-sub');
+  var seekBar = $('seek-bar');
+  var currentTimeEl = $('current-time');
+  var durationEl = $('duration');
+  var playBtn = $('play-btn');
+  var prevBtn = $('prev-btn');
+  var nextBtn = $('next-btn');
+  var shuffleBtn = $('shuffle-btn');
+  var loopBtn = $('loop-btn');
+  var speedSelect = $('speed-select');
+  var muteBtn = $('mute-btn');
+  var volumeSlider = $('volume-slider');
+  var volumeValue = $('volume-value');
+  var playlistEl = $('playlist');
+  var playlistCount = $('playlist-count');
+  var downloadBtn = $('download-html-btn');
+  var tracks = [];
+  var currentIndex = -1;
+  var shuffle = false;
+  var loopMode = 'off'; 
+  var navHistory = [];
+  var played = {};   
+  var seeking = false;
+  var nextId = 1;
+  var audioCtx = null, analyser = null, sourceNode = null, freqData = null;
+  var autoplayBlocked = false;
+
+  function fmtTime(sec) {
+    if (!isFinite(sec) || sec < 0) return '0:00';
+    sec = Math.floor(sec);
+    var m = Math.floor(sec / 60), s = sec % 60;
+    var h = Math.floor(m / 60); m = m % 60;
+    var ss = (s < 10 ? '0' : '') + s;
+    return h > 0 ? h + ':' + (m < 10 ? '0' : '') + m + ':' + ss : m + ':' + ss;
+  }
+  function setStatus(msg) { statusEl.textContent = msg || ''; }
+  function extOf(name) { var i = name.lastIndexOf('.'); return i < 0 ? '' : name.slice(i + 1).toLowerCase(); }
+  function isAudioFile(file) {
+    if (file.type && file.type.indexOf('audio/') === 0) return true;
+    return AUDIO_EXT.indexOf(extOf(file.name)) !== -1;
+  }
+  function baseName(name) { var i = name.lastIndexOf('.'); return i > 0 ? name.slice(0, i) : name; }
+
+  function addFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    var added = 0, skipped = 0;
+    files.sort(function (a, b) {
+      var pa = a.webkitRelativePath || a.name, pb = b.webkitRelativePath || b.name;
+      return pa.localeCompare(pb, 'ja', { numeric: true });
+    });
+    files.forEach(function (f) {
+      if (!isAudioFile(f)) { skipped++; return; }
+      var path = f.webkitRelativePath || f._relPath || '';
+      tracks.push({ id: nextId++, name: baseName(f.name), fileName: f.name, path: path, file: f, url: URL.createObjectURL(f), duration: NaN });
+      added++;
+    });
+    var msg = added + ' 曲を追加しました';
+    if (skipped) msg += '（' + skipped + ' 件スキップ: 非対応形式）';
+    if (!added && !skipped) msg = '音楽ファイルが見つかりませんでした';
+    setStatus(msg);
+    renderPlaylist();
+    loadDurations();
+    if (currentIndex === -1 && tracks.length) { playIndex(0, false); }
+    return { added: added, skipped: skipped };
+  }
+  var durQueueRunning = 0;
+  function loadDurations() {
+    if (durQueueRunning >= 2) return;
+    var t = null;
+    for (var i = 0; i < tracks.length; i++) { if (tracks[i].duration !== tracks[i].duration && !tracks[i]._loading) { t = tracks[i]; break; } }
+    if (!t) return;
+    t._loading = true; durQueueRunning++;
+    var probe = document.createElement('audio');
+    probe.preload = 'metadata';
+    var done = function (ok) {
+      probe.onloadedmetadata = probe.onerror = null;
+      t.duration = ok && isFinite(probe.duration) ? probe.duration : -1;
+      probe.removeAttribute('src'); probe.load();
+      durQueueRunning--;
+      renderPlaylist();
+      loadDurations();
+    };
+    probe.onloadedmetadata = function () { done(true); };
+    probe.onerror = function () { done(false); };
+    probe.src = t.url;
+    if (durQueueRunning < 2) loadDurations();
+  }
+  function readAllEntries(reader) {
+    return new Promise(function (resolve, reject) {
+      var all = [];
+      (function batch() {
+        reader.readEntries(function (entries) {
+          if (!entries.length) { resolve(all); return; }
+          all = all.concat(entries); batch();
+        }, reject);
+      })();
+    });
+  }
+  function traverseEntry(entry, prefix) {
+    if (entry.isFile) {
+      return new Promise(function (resolve) {
+        entry.file(function (f) { try { f._relPath = prefix + f.name; } catch (e) {} resolve([f]); }, function () { resolve([]); });
+      });
+    }
+    if (entry.isDirectory) {
+      return readAllEntries(entry.createReader()).then(function (entries) {
+        return Promise.all(entries.map(function (en) { return traverseEntry(en, prefix + entry.name + '/'); }));
+      }).then(function (arrs) { return [].concat.apply([], arrs); });
+    }
+    return Promise.resolve([]);
+  }
+  async function handleDrop(e) {
+    e.preventDefault(); dropZone.classList.remove('dragover');
+    var dt = e.dataTransfer; if (!dt) return;
+    var items = dt.items;
+    var files = [];
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      var promises = [];
+      for (var i = 0; i < items.length; i++) {
+        var entry = items[i].webkitGetAsEntry && items[i].webkitGetAsEntry();
+        if (entry) promises.push(traverseEntry(entry, ''));
+        else if (items[i].getAsFile) { var f = items[i].getAsFile(); if (f) promises.push(Promise.resolve([f])); }
+      }
+      setStatus('読み込み中...');
+      var arrs = await Promise.all(promises);
+      files = [].concat.apply([], arrs);
+    } else {
+      files = Array.prototype.slice.call(dt.files || []);
+    }
+    addFiles(files);
+  }
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    dropZone.addEventListener(ev, function (e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+    document.body.addEventListener(ev, function (e) { e.preventDefault(); });
+  });
+  dropZone.addEventListener('dragleave', function (e) { if (e.target === dropZone) dropZone.classList.remove('dragover'); });
+  dropZone.addEventListener('drop', handleDrop);
+  document.body.addEventListener('drop', function (e) { if (!dropZone.contains(e.target)) handleDrop(e); });
+
+  fileInput.addEventListener('change', function () { addFiles(fileInput.files); fileInput.value = ''; });
+  folderInput.addEventListener('change', function () { addFiles(folderInput.files); folderInput.value = ''; });
+
+  clearBtn.addEventListener('click', function () {
+    stopPlayback();
+    tracks.forEach(function (t) { URL.revokeObjectURL(t.url); });
+    tracks = []; currentIndex = -1; navHistory = []; played = {};
+    audio.removeAttribute('src'); audio.load();
+    trackTitle.textContent = '曲が選択されていません'; trackSub.textContent = '';
+    seekBar.value = 0; currentTimeEl.textContent = '0:00'; durationEl.textContent = '0:00';
+    renderPlaylist(); setStatus('プレイリストをクリアしました');
+  });
+
+  function renderPlaylist() {
+    playlistEl.innerHTML = '';
+    playlistCount.textContent = tracks.length + ' 曲';
+    if (!tracks.length) {
+      var li = document.createElement('li'); li.className = 'empty'; li.style.cursor = 'default';
+      li.textContent = 'まだ曲がありません。上のボタンから音楽ファイルを追加してください。';
+      playlistEl.appendChild(li); return;
+    }
+    tracks.forEach(function (t, i) {
+      var li = document.createElement('li');
+      if (i === currentIndex) li.className = 'current';
+      li.dataset.index = i;
+      var idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = (i === currentIndex && !audio.paused) ? '▶' : (i + 1);
+      var name = document.createElement('span'); name.className = 'name'; name.textContent = t.name; name.title = t.fileName;
+      var path = document.createElement('span'); path.className = 'path';
+      var dir = t.path ? t.path.slice(0, t.path.lastIndexOf('/')) : ''; path.textContent = dir; path.title = dir;
+      var dur = document.createElement('span'); dur.className = 'dur'; dur.textContent = t.duration >= 0 ? fmtTime(t.duration) : (t.duration === -1 ? '--:--' : '…');
+      var rm = document.createElement('button'); rm.className = 'remove'; rm.type = 'button'; rm.title = '削除'; rm.textContent = '✕';
+      rm.addEventListener('click', function (e) { e.stopPropagation(); removeTrack(i); });
+      li.appendChild(idx); li.appendChild(name); li.appendChild(path); li.appendChild(dur); li.appendChild(rm);
+      li.addEventListener('click', function () { playIndex(i, true); });
+      playlistEl.appendChild(li);
+    });
+  }
+  function removeTrack(i) {
+    var t = tracks[i]; if (!t) return;
+    var wasCurrent = (i === currentIndex);
+    URL.revokeObjectURL(t.url);
+    tracks.splice(i, 1);
+    navHistory = navHistory.filter(function (h) { return h !== t.id; });
+    delete played[t.id];
+    if (!tracks.length) { clearBtn.click(); return; }
+    if (wasCurrent) {
+      var playing = !audio.paused;
+      playIndex(Math.min(i, tracks.length - 1), playing);
+    } else if (i < currentIndex) { currentIndex--; }
+    renderPlaylist();
+  }
+
+  function ensureAudioGraph() {
+    if (audioCtx) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      audioCtx = new AC();
+      sourceNode = audioCtx.createMediaElementSource(audio);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
+      sourceNode.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+    } catch (e) { console.warn('AudioContext unavailable:', e); audioCtx = null; }
+  }
+  function applySpeed() {
+    var r = parseFloat(speedSelect.value) || 1;
+    audio.defaultPlaybackRate = r; audio.playbackRate = r;
+    try { audio.preservesPitch = true; audio.mozPreservesPitch = true; } catch (e) {}
+  }
+  async function tryPlay() {
+    ensureAudioGraph();
+    if (audioCtx && audioCtx.state === 'suspended') { audioCtx.resume().catch(function () {}); }
+    try { await audio.play(); autoplayBlocked = false; }
+    catch (err) {
+      if (err && err.name === 'NotAllowedError') { autoplayBlocked = true; setStatus('▶ ボタンを押して再生を開始してください'); }
+      else if (err && err.name !== 'AbortError') { console.warn('play() failed:', err); setStatus('再生できませんでした: ' + (err.message || err.name)); }
+    }
+  }
+  async function playIndex(i, autoplay, pushHistory) {
+    if (!tracks.length) return;
+    if (autoplay === undefined) autoplay = true;
+    i = ((i % tracks.length) + tracks.length) % tracks.length;
+    if (pushHistory !== false && currentIndex >= 0 && tracks[currentIndex]) navHistory.push(tracks[currentIndex].id);
+    if (navHistory.length > 200) navHistory.shift();
+    currentIndex = i;
+    var t = tracks[i];
+    played[t.id] = true;
+    audio.src = t.url;
+    applySpeed();
+    audio.loop = (loopMode === 'one');
+    audio.load();
+    trackTitle.textContent = t.name;
+    trackSub.textContent = (t.path ? t.path + ' • ' : '') + (t.file.type || extOf(t.fileName).toUpperCase()) + ' • ' + (t.file.size / 1024 / 1024).toFixed(2) + ' MB';
+    seekBar.value = 0; currentTimeEl.textContent = '0:00';
+    durationEl.textContent = t.duration >= 0 ? fmtTime(t.duration) : '0:00';
+    renderPlaylist();
+    if (autoplay) await tryPlay();
+  }
+  function stopPlayback() { audio.pause(); }
+
+  function pickShuffleNext() {
+    var candidates = [];
+    for (var i = 0; i < tracks.length; i++) { if (!played[tracks[i].id] && i !== currentIndex) candidates.push(i); }
+    if (!candidates.length) return -1;
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+  function randomOther() {
+    if (tracks.length <= 1) return 0;
+    var r; do { r = Math.floor(Math.random() * tracks.length); } while (r === currentIndex);
+    return r;
+  }
+
+  function advance(fromEnded) {
+    if (!tracks.length) return;
+    if (shuffle) {
+      var n = pickShuffleNext();
+      if (n === -1) {
+        if (fromEnded && loopMode !== 'all') { finishAll(); return; }
+        played = {}; n = randomOther();
+      }
+      playIndex(n, true);
+    } else {
+      if (currentIndex + 1 >= tracks.length) {
+        if (fromEnded && loopMode !== 'all') { finishAll(); return; }
+        playIndex(0, true);
+      } else { playIndex(currentIndex + 1, true); }
+    }
+  }
+  function finishAll() {
+    audio.pause();
+    try { audio.currentTime = 0; } catch (e) {}
+    played = {};
+    setStatus('プレイリストの再生が終了しました');
+    updatePlayButton();
+  }
+  function goPrev() {
+    if (!tracks.length) return;
+    if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+    if (shuffle && navHistory.length) {
+      var id = navHistory.pop();
+      var idx = -1; for (var i = 0; i < tracks.length; i++) { if (tracks[i].id === id) { idx = i; break; } }
+      if (idx >= 0) { playIndex(idx, true, false); return; }
+    }
+    playIndex(currentIndex - 1, true);
+  }
+  function togglePlay() {
+    if (!tracks.length) { setStatus('先に音楽ファイルを追加してください'); return; }
+    if (currentIndex === -1) { playIndex(0, true); return; }
+    if (audio.paused) tryPlay(); else audio.pause();
+  }
+  function updatePlayButton() {
+    var playing = !audio.paused && !audio.ended;
+    playBtn.textContent = playing ? '⏸' : '▶';
+    playBtn.title = playing ? '一時停止' : '再生';
+    var cur = playlistEl.querySelector('li.current .idx');
+    if (cur) cur.textContent = playing ? '▶' : (currentIndex + 1);
+  }
+  function setLoopMode(mode) {
+    loopMode = mode;
+    audio.loop = (mode === 'one');
+    loopBtn.textContent = mode === 'one' ? '🔂' : '🔁';
+    loopBtn.classList.toggle('active', mode !== 'off');
+    loopBtn.title = 'ループ: ' + (mode === 'off' ? 'オフ' : mode === 'all' ? '全曲' : '1曲');
+    loopBtn.setAttribute('aria-pressed', mode !== 'off');
+  }
+  function setShuffle(on) {
+    shuffle = !!on; played = {};
+    if (currentIndex >= 0 && tracks[currentIndex]) played[tracks[currentIndex].id] = true;
+    shuffleBtn.classList.toggle('active', shuffle);
+    shuffleBtn.setAttribute('aria-pressed', shuffle);
+    shuffleBtn.title = 'ランダム再生: ' + (shuffle ? 'オン' : 'オフ');
+  }
+  function setVolume(v) {
+    v = Math.max(0, Math.min(100, Math.round(v)));
+    audio.volume = v / 100;
+    volumeSlider.value = v; volumeValue.textContent = v + '%';
+    if (v > 0 && audio.muted) audio.muted = false;
+    updateMuteButton();
+  }
+  function updateMuteButton() {
+    var v = audio.volume;
+    muteBtn.textContent = (audio.muted || v === 0) ? '🔇' : v < 0.5 ? '🔉' : '🔊';
+    muteBtn.classList.toggle('active', audio.muted);
+  }
+
+  playBtn.addEventListener('click', togglePlay);
+  prevBtn.addEventListener('click', goPrev);
+  nextBtn.addEventListener('click', function () { advance(false); });
+  shuffleBtn.addEventListener('click', function () { setShuffle(!shuffle); });
+  loopBtn.addEventListener('click', function () { setLoopMode(loopMode === 'off' ? 'all' : loopMode === 'all' ? 'one' : 'off'); });
+  speedSelect.addEventListener('change', applySpeed);
+  volumeSlider.addEventListener('input', function () { setVolume(parseFloat(volumeSlider.value)); });
+  muteBtn.addEventListener('click', function () { audio.muted = !audio.muted; updateMuteButton(); });
+
+  seekBar.addEventListener('input', function () {
+    seeking = true;
+    if (isFinite(audio.duration)) currentTimeEl.textContent = fmtTime(seekBar.value / 1000 * audio.duration);
+  });
+  seekBar.addEventListener('change', function () {
+    if (isFinite(audio.duration)) audio.currentTime = seekBar.value / 1000 * audio.duration;
+    seeking = false;
+  });
+  audio.addEventListener('loadedmetadata', function () {
+    durationEl.textContent = fmtTime(audio.duration);
+    if (currentIndex >= 0 && tracks[currentIndex] && isFinite(audio.duration)) { tracks[currentIndex].duration = audio.duration; renderPlaylist(); }
+  });
+  audio.addEventListener('timeupdate', function () {
+    if (seeking || !isFinite(audio.duration) || audio.duration === 0) return;
+    seekBar.value = Math.round(audio.currentTime / audio.duration * 1000);
+    currentTimeEl.textContent = fmtTime(audio.currentTime);
+  });
+  audio.addEventListener('play', updatePlayButton);
+  audio.addEventListener('pause', updatePlayButton);
+  audio.addEventListener('ended', function () { if (loopMode !== 'one') advance(true); });
+  audio.addEventListener('error', function () {
+    var t = tracks[currentIndex];
+    setStatus('再生できないファイルです: ' + (t ? t.fileName : '') + '（ブラウザ非対応の形式の可能性があります）');
+  });
+  audio.addEventListener('volumechange', updateMuteButton);
+
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'select' || tag === 'textarea' || tag === 'button') return;
+    if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+    else if (e.code === 'ArrowRight') { audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5); }
+    else if (e.code === 'ArrowLeft') { audio.currentTime = Math.max(0, audio.currentTime - 5); }
+    else if (e.code === 'ArrowUp') { e.preventDefault(); setVolume(parseFloat(volumeSlider.value) + 5); }
+    else if (e.code === 'ArrowDown') { e.preventDefault(); setVolume(parseFloat(volumeSlider.value) - 5); }
+  });
+
+  var BAR_COUNT = 64;
+  var smoothed = new Float32Array(BAR_COUNT);
+  function resizeCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    var w = canvas.clientWidth || 600, h = canvas.clientHeight || 180;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    }
+  }
+  function drawSpectrum() {
+    requestAnimationFrame(drawSpectrum);
+    resizeCanvas();
+    var W = canvas.width, H = canvas.height;
+    ctx2d.clearRect(0, 0, W, H);
+    var active = analyser && !audio.paused;
+    if (active) analyser.getByteFrequencyData(freqData);
+    var usable = freqData ? Math.floor(freqData.length * 0.7) : 0;
+    var gap = W * 0.004, barW = (W - gap * (BAR_COUNT + 1)) / BAR_COUNT;
+    var grad = ctx2d.createLinearGradient(0, H, 0, 0);
+    grad.addColorStop(0, '#4fd1c5'); grad.addColorStop(0.6, '#7f9cf5'); grad.addColorStop(1, '#f687b3');
+    ctx2d.fillStyle = grad;
+    for (var i = 0; i < BAR_COUNT; i++) {
+      var v = 0;
+      if (active && usable) {
+        var start = Math.floor(Math.pow(i / BAR_COUNT, 1.6) * usable);
+        var end = Math.max(start + 1, Math.floor(Math.pow((i + 1) / BAR_COUNT, 1.6) * usable));
+        var sum = 0; for (var k = start; k < end; k++) sum += freqData[k];
+        v = sum / (end - start) / 255;
+      }
+      smoothed[i] = v > smoothed[i] ? v : smoothed[i] * 0.88;
+      var bh = Math.max(2 * (window.devicePixelRatio || 1), smoothed[i] * (H - 8));
+      var x = gap + i * (barW + gap);
+      var r = Math.min(barW / 2, 4);
+      ctx2d.beginPath();
+      ctx2d.moveTo(x, H); ctx2d.lineTo(x, H - bh + r); ctx2d.quadraticCurveTo(x, H - bh, x + r, H - bh);
+      ctx2d.lineTo(x + barW - r, H - bh); ctx2d.quadraticCurveTo(x + barW, H - bh, x + barW, H - bh + r);
+      ctx2d.lineTo(x + barW, H); ctx2d.closePath(); ctx2d.fill();
+    }
+  }
+  drawSpectrum();
+
+  setVolume(80); setLoopMode('off'); setShuffle(false); applySpeed(); renderPlaylist(); updatePlayButton();
+
+  function makeWavFile(name, freq, seconds) {
+    var sr = 8000, n = Math.floor(sr * seconds);
+    var buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf);
+    var ws = function (o, s) { for (var i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+    ws(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE'); ws(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    ws(36, 'data'); dv.setUint32(40, n * 2, true);
+    for (var i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * freq * i / sr) * 12000), true);
+    return new File([buf], name, { type: 'audio/wav' });
+  }
+  function waitUntil(fn, ms) {
+    return new Promise(function (resolve) {
+      var t0 = Date.now();
+      (function poll() { if (fn()) resolve(true); else if (Date.now() - t0 > ms) resolve(false); else setTimeout(poll, 30); })();
+    });
+  }
+  async function runSelfTest() {
+    var pass = 0, fails = [];
+    var check = function (cond, msg) { if (cond) { pass++; console.log('[PASS] ' + msg); } else { fails.push(msg); console.error('[FAIL] ' + msg); } };
+    try {
+      var r = addFiles([makeWavFile('test-a.wav', 440, 2), makeWavFile('test-b.wav', 660, 1.5), makeWavFile('test-c.wav', 880, 1), new File(['hello'], 'readme.txt', { type: 'text/plain' })]);
+      check(r.added === 3 && r.skipped === 1 && tracks.length === 3, 'addFiles: 3 audio added, 1 non-audio skipped');
+      check(currentIndex === 0 && trackTitle.textContent === 'test-a', 'first track auto-selected');
+      await playIndex(0, true);
+      check(await waitUntil(function () { return audio.readyState >= 1; }, 3000), 'metadata loaded');
+      check(Math.abs(audio.duration - 2) < 0.1, 'duration ≈ 2s (' + audio.duration.toFixed(2) + ')');
+      check(await waitUntil(function () { return tracks.every(function (t) { return t.duration > 0; }); }, 4000), 'playlist durations loaded: ' + tracks.map(function (t) { return t.duration.toFixed(1); }).join(','));
+      check(analyser !== null, 'AudioContext + AnalyserNode created (spectrum)');
+      check(!audio.paused || autoplayBlocked, 'play() started (paused=' + audio.paused + ', autoplayBlocked=' + autoplayBlocked + ')');
+      check(playBtn.textContent === (audio.paused ? '▶' : '⏸'), 'play button reflects state');
+      speedSelect.value = '1.5'; speedSelect.dispatchEvent(new Event('change'));
+      check(audio.playbackRate === 1.5, 'speed 1.5x applied');
+      volumeSlider.value = 40; volumeSlider.dispatchEvent(new Event('input'));
+      check(Math.abs(audio.volume - 0.4) < 0.001 && volumeValue.textContent === '40%', 'volume 40% applied');
+      muteBtn.click(); check(audio.muted === true && muteBtn.textContent === '🔇', 'mute on');
+      muteBtn.click(); check(audio.muted === false, 'mute off');
+      seekBar.value = 500; seekBar.dispatchEvent(new Event('input')); seekBar.dispatchEvent(new Event('change'));
+      check(await waitUntil(function () { return Math.abs(audio.currentTime - 1) < 0.25; }, 2000), 'seek to 50% → currentTime ≈ 1s (' + audio.currentTime.toFixed(2) + ')');
+      loopBtn.click(); check(loopMode === 'all' && !audio.loop, 'loop → all');
+      loopBtn.click(); check(loopMode === 'one' && audio.loop === true, 'loop → one (audio.loop=true)');
+      loopBtn.click(); check(loopMode === 'off' && audio.loop === false, 'loop → off');
+      shuffleBtn.click(); check(shuffle === true && shuffleBtn.classList.contains('active'), 'shuffle on');
+      nextBtn.click(); await waitUntil(function () { return currentIndex !== 0; }, 500);
+      check(currentIndex !== 0, 'shuffle next moved to another track (' + currentIndex + ')');
+      var afterFirst = currentIndex;
+      nextBtn.click(); await waitUntil(function () { return currentIndex !== afterFirst; }, 500);
+      check(currentIndex !== afterFirst && currentIndex !== 0, 'shuffle next picks unplayed track (' + currentIndex + ')');
+      prevBtn.click(); await waitUntil(function () { return currentIndex === afterFirst; }, 500);
+      check(currentIndex === afterFirst, 'shuffle prev returns via history');
+      shuffleBtn.click(); check(shuffle === false, 'shuffle off');
+      await playIndex(2, false);
+      audio.dispatchEvent(new Event('ended'));
+      await waitUntil(function () { return false; }, 100);
+      check(currentIndex === 2 && audio.paused, 'ended on last track with loop off → stops');
+      setLoopMode('all'); await playIndex(2, false);
+      audio.dispatchEvent(new Event('ended'));
+      check(await waitUntil(function () { return currentIndex === 0; }, 500), 'ended on last track with loop all → wraps to first');
+      setLoopMode('off');
+      await playIndex(1, false); nextBtn.click(); check(currentIndex === 2, 'manual next (sequential)');
+      prevBtn.click(); check(currentIndex === 1, 'manual prev (sequential)');
+      check(playlistEl.querySelectorAll('li').length === 3, 'playlist rendered 3 items');
+      playlistEl.querySelectorAll('li')[2].click(); check(currentIndex === 2 && playlistEl.querySelectorAll('li')[2].classList.contains('current'), 'click playlist item selects track');
+      removeTrack(0); check(tracks.length === 2 && currentIndex === 1 && tracks[currentIndex].name === 'test-c', 'remove track keeps current selection');
+      var html = await getOwnHtml();
+      check(html.length > 5000 && html.indexOf('id="spectrum"') !== -1 && /<\/html>\s*$/i.test(html), 'own HTML retrieved for download (' + html.length + ' chars)');
+      check(canvas.width > 0 && canvas.height > 0, 'spectrum canvas sized ' + canvas.width + 'x' + canvas.height);
+      clearBtn.click(); check(tracks.length === 0 && currentIndex === -1, 'clear all');
+    } catch (e) { fails.push('exception: ' + (e && e.stack || e)); console.error(e); }
+    var summary = fails.length ? 'SELFTEST FAIL (' + fails.length + '): ' + fails.join(' | ') : 'SELFTEST PASS (' + pass + ' checks)';
+    console.log(summary); setStatus(summary);
+    document.body.setAttribute('data-selftest', fails.length ? 'fail' : 'pass');
+  }
+  if (/[?&]selftest=1/.test(location.search)) { window.addEventListener('load', function () { setTimeout(runSelfTest, 200); }); }
+})();
+</script>
+<script src="https://www.genspark.ai/sandbox_inspect.js"></script></body>
+</html>
