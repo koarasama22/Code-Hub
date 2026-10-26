@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>伝言ゲーム</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; min-height:100%;
+    background:radial-gradient(circle at 20% 0%, #0d2b3d 0%, transparent 45%),
+               radial-gradient(circle at 100% 100%, #3a1550 0%, transparent 40%), #0f0c18;
+    color:#f5f0ff;
+    font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:30px 16px 60px;
+  }
+  a.back{ align-self:flex-start; color:#a89fc4; text-decoration:none; font-size:0.85rem; margin-bottom:10px;}
+  h1{
+    font-size:2.1rem; margin:0 0 4px;
+    background:linear-gradient(120deg,#7cd8ff,#c77dff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  p.sub{ color:#a89fc4; margin:0 0 26px; font-size:0.88rem; text-align:center; max-width:480px;}
+
+  .level-select{
+    display:flex; gap:8px; margin-bottom:22px;
+  }
+  .lv-btn{
+    background:#1c1729; border:1px solid #ffffff1c; color:#cfc3ea;
+    padding:9px 18px; border-radius:20px; font-size:0.85rem; cursor:pointer;
+  }
+  .lv-btn.active{ background:linear-gradient(120deg,#7cd8ff,#c77dff); color:#101018; font-weight:700; border-color:transparent;}
+
+  .stage{
+    width:100%; max-width:600px;
+    background:#1c1729; border:1px solid #ffffff14; border-radius:24px;
+    padding:44px 30px; text-align:center; min-height:220px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  }
+  #phrase{
+    font-size:1.7rem; font-weight:800; line-height:1.6;
+    color:#ffd166;
+  }
+  .placeholder{ color:#7a6f96; font-size:1rem; }
+  #answerReveal{
+    display:none; font-size:0.9rem; color:#7a6f96;
+  }
+
+  button{
+    font-size:1.05rem; font-weight:700; border:none; border-radius:14px;
+    padding:16px 30px; cursor:pointer; transition:transform .12s ease;
+  }
+  button:active{ transform:scale(0.96); }
+  .btn-row{ display:flex; gap:14px; margin-top:26px; flex-wrap:wrap; justify-content:center;}
+  #drawBtn{ background:linear-gradient(120deg,#7cd8ff,#c77dff); color:#101018; font-size:1.15rem; padding:17px 38px;}
+  #hideBtn{ background:#2a2438; color:#e6dcff; }
+
+  footer{ margin-top:30px; color:#7a6f96; font-size:0.75rem; text-align:center; max-width:520px; line-height:1.7;}
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← ゲーム一覧</a>
+  <h1>🤫 伝言ゲーム</h1>
+  <p class="sub">最初の人だけがこのお題を見て、次の人に小声で耳打ち。最後の人まで伝わったら答え合わせ！</p>
+
+  <div class="level-select">
+    <button class="lv-btn active" data-lv="easy">かんたん</button>
+    <button class="lv-btn" data-lv="normal">ふつう</button>
+    <button class="lv-btn" data-lv="hard">むずかしい</button>
+  </div>
+
+  <div class="stage">
+    <div id="empty" class="placeholder">「お題を引く」を押して、最初の人だけ画面を見てね</div>
+    <div id="phrase" style="display:none;"></div>
+  </div>
+
+  <div class="btn-row">
+    <button id="drawBtn">お題を引く</button>
+    <button id="hideBtn">画面を隠す</button>
+  </div>
+
+  <footer>列になって一列に並び、先頭の人だけがお題を確認。あとは順番に隣の人へ小声で伝えていき、最後の人が発表した答えと元のお題を見比べて答え合わせしよう。</footer>
+
+<script>
+(function(){
+  const phrases = {
+    easy: [
+      "赤いりんごを食べた","公園で犬が走っている","眠たいので早く寝たい",
+      "駅前で友達と待ち合わせ","今日は天気がとても良い","おいしいラーメンを食べたい",
+      "猫が窓辺で眠っている","新しい靴を買いに行く","電車が少し遅れている",
+      "明日は早起きする予定"
+    ],
+    normal: [
+      "隣町のパン屋さんの食パンはふわふわで評判だ","週末に家族で動物園へ行く約束をした",
+      "冷蔵庫の中のプリンを誰かが食べてしまった","夕方の空はオレンジ色に染まっていた",
+      "図書館で借りた本を返し忘れていた","雨の日は傘を忘れずに持って出かけよう",
+      "隣の席の人がずっと鼻歌を歌っている","新しくできたカフェのケーキが評判らしい",
+      "駅の階段で財布を落としそうになった","朝から缶コーヒーを2本も飲んでしまった"
+    ],
+    hard: [
+      "裏山であじさいが咲き始めたので写真を撮りに行こうと思っている",
+      "隣のクラスの先生が来月から海外に転勤するという噂を聞いた",
+      "商店街の福引きで三等の温泉旅行券が当たって驚いている",
+      "台風が近づいているので、ベランダの植木鉢を室内に入れておいた",
+      "久しぶりに開いたアルバムに、昔飼っていたハムスターの写真があった",
+      "駅前のロータリーで大道芸人がジャグリングを披露していて人だかりができていた",
+      "祖母の家の庭に、去年植えた柿の木が初めて実をつけたそうだ",
+      "遠足のしおりを忘れてきた友達に、こっそり集合場所を教えてあげた"
+    ]
+  };
+
+  let currentLv = 'easy';
+  const emptyEl = document.getElementById('empty');
+  const phraseEl = document.getElementById('phrase');
+  const drawBtn = document.getElementById('drawBtn');
+  const hideBtn = document.getElementById('hideBtn');
+  const levelSelect = document.querySelector('.level-select');
+
+  levelSelect.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.lv-btn');
+    if(!btn) return;
+    [...levelSelect.children].forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentLv = btn.dataset.lv;
+  });
+
+  drawBtn.addEventListener('click', ()=>{
+    const pool = phrases[currentLv];
+    const p = pool[Math.floor(Math.random()*pool.length)];
+    emptyEl.style.display = 'none';
+    phraseEl.style.display = 'block';
+    phraseEl.textContent = p;
+  });
+
+  hideBtn.addEventListener('click', ()=>{
+    phraseEl.style.display = 'none';
+    emptyEl.style.display = 'block';
+    emptyEl.textContent = '画面を隠しました。伝言を回そう！';
+  });
+})();
+</script>
+</body>
+</html>
