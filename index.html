@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Collection — 全部ここから動かせる</title>
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --card: #1a1a24;
+      --card-hover: #242433;
+      --accent: #7c5cff;
+      --accent2: #00d4ff;
+      --text: #f0f0f5;
+      --muted: #8888a0;
+      --border: #2a2a3a;
+      --game: #ff6b6b;
+      --tool: #4ecdc4;
+      --racing: #ffe66d;
+      --puzzle: #a78bfa;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* Animated background */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% -20%, rgba(124, 92, 255, 0.15), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0, 212, 255, 0.1), transparent);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 5vw, 2.8rem);
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .stats {
+      display: flex;
+      gap: 1.5rem;
+      justify-content: center;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.6rem 1.2rem;
+      font-size: 0.9rem;
+    }
+
+    .stat strong {
+      color: var(--accent2);
+    }
+
+    /* Search & Filter */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.75rem;
+      align-items: center;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 0.75rem 1rem 0.75rem 2.5rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--accent);
+    }
+
+    .search-box::before {
+      content: "🔍";
+      position: absolute;
+      left: 0.9rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.95rem;
+      opacity: 0.7;
+    }
+
+    .filters {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 0.5rem 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .filter-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    /* Grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.4rem;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s, background 0.2s, border-color 0.2s;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      background: var(--card-hover);
+      border-color: var(--accent);
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--tag-color, var(--accent));
+      opacity: 0.8;
+    }
+
+    .card-icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .card-desc {
+      color: var(--muted);
+      font-size: 0.88rem;
+      flex: 1;
+      margin-bottom: 1rem;
+    }
+
+    .card-tag {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      background: color-mix(in srgb, var(--tag-color) 20%, transparent);
+      color: var(--tag-color);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .card[data-category="game"] { --tag-color: var(--game); }
+    .card[data-category="tool"] { --tag-color: var(--tool); }
+    .card[data-category="racing"] { --tag-color: var(--racing); }
+    .card[data-category="puzzle"] { --tag-color: var(--puzzle); }
+
+    .hidden {
+      display: none !important;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .container { padding: 1.25rem 1rem 3rem; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Code Collection</h1>
+      <p class="subtitle">たくさんのゲーム＆ツールを1箇所からすぐ起動</p>
+      <div class="stats">
+        <div class="stat">全 <strong id="total-count">0</strong> 作品</div>
+        <div class="stat">表示中 <strong id="visible-count">0</strong></div>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="search-box">
+        <input type="search" id="search" placeholder="名前や説明で検索..." autocomplete="off" />
+      </div>
+      <div class="filters">
+        <button class="filter-btn active" data-filter="all">すべて</button>
+        <button class="filter-btn" data-filter="game">ゲーム</button>
+        <button class="filter-btn" data-filter="puzzle">パズル</button>
+        <button class="filter-btn" data-filter="racing">レーシング</button>
+        <button class="filter-btn" data-filter="tool">ツール</button>
+      </div>
+    </div>
+
+    <div class="grid" id="grid">
+      <!-- Cards injected by JS -->
+    </div>
+
+    <footer>
+      <p>ローカルで開いています。各作品は新しいタブで起動します。</p>
+    </footer>
+  </div>
+
+  <script>
+    const items = [
+      // Games
+      {
+        title: "2048",
+        desc: "クラシックな数字合わせパズル。矢印キーでスライドして2048を目指そう。",
+        path: "Code/2048_game/2048_game.html",
+        icon: "🔢",
+        category: "puzzle",
+        tags: ["パズル", "数字"]
+      },
+      {
+        title: "Snake",
+        desc: "古典的なスネークゲーム。食べて長くなり、自分にぶつからないように。",
+        path: "Code/snake/index.html",
+        icon: "🐍",
+        category: "game",
+        tags: ["アクション"]
+      },
+      {
+        title: "Sokoban",
+        desc: "箱押しパズルの名作。すべての箱を目標位置に運ぼう。",
+        path: "Code/sokoban/index.html",
+        icon: "📦",
+        category: "puzzle",
+        tags: ["パズル"]
+      },
+      {
+        title: "Bee Kind",
+        desc: "蜂になって花から花へ飛ぶアクションパズル。",
+        path: "Code/bee-kind/index.html",
+        icon: "🐝",
+        category: "game",
+        tags: ["アクション"]
+      },
+      {
+        title: "Block Dodge",
+        desc: "落ちてくるブロックをかわし続けるシンプルな回避ゲーム。",
+        path: "Code/block-dodge/block-dodge.html",
+        icon: "⬜",
+        category: "game",
+        tags: ["アクション"]
+      },
+      {
+        title: "Bounce Back",
+        desc: "ボールを跳ね返して進むプラットフォーム風ゲーム。",
+        path: "Code/bounce-back/index.html",
+        icon: "🏀",
+        category: "game",
+        tags: ["アクション"]
+      },
+      {
+        title: "Tower Game",
+        desc: "ブロックを積み上げて高い塔を作るバランスゲーム。",
+        path: "Code/tower-game/index.html",
+        icon: "🏗️",
+        category: "game",
+        tags: ["バランス"]
+      },
+      {
+        title: "The Unavoidable",
+        desc: "避けられない運命？ユニークな体験型ゲーム。",
+        path: "Code/the-unavoidable/index.html",
+        icon: "🌀",
+        category: "game",
+        tags: ["体験"]
+      },
+      {
+        title: "Death Game",
+        desc: "デスゲーム風のインタラクティブな体験。",
+        path: "Code/death-game/index.html",
+        icon: "💀",
+        category: "game",
+        tags: ["体験"]
+      },
+      {
+        title: "Escape from Death Hole",
+        desc: "デスホールから脱出するアクションゲーム。",
+        path: "Code/escape-from-death-hole/index.html",
+        icon: "🕳️",
+        category: "game",
+        tags: ["アクション"]
+      },
+      {
+        title: "Space Huggers",
+        desc: "スペースをテーマにしたユニークなゲーム。",
+        path: "Code/SpaceHuggers-main/index.html",
+        icon: "🚀",
+        category: "game",
+        tags: ["アクション"]
+      },
+      {
+        title: "Black Hole Square",
+        desc: "ブラックホールと四角形をモチーフにしたゲーム。",
+        path: "Code/black-hole-square/index.html",
+        icon: "⬛",
+        category: "game",
+        tags: ["アクション"]
+      },
+      {
+        title: "Bingo",
+        desc: "シンプルなビンゴゲーム。パーティーに最適。",
+        path: "Code/bingo/bingo.html",
+        icon: "🎱",
+        category: "game",
+        tags: ["パーティー"]
+      },
+      {
+        title: "Charades",
+        desc: "ジェスチャーゲーム「チャーレーズ」用のツール。",
+        path: "Code/charades/charades.html",
+        icon: "🎭",
+        category: "game",
+        tags: ["パーティー"]
+      },
+      {
+        title: "Telephone Game",
+        desc: "伝言ゲームをオンラインで楽しめるツール。",
+        path: "Code/telephone-game/telephone-game.html",
+        icon: "📞",
+        category: "game",
+        tags: ["パーティー"]
+      },
+      {
+        title: "Werewolf Role",
+        desc: "人狼ゲームの役職割り当てツール。",
+        path: "Code/werewolf-role/werewolf-role.html",
+        icon: "🐺",
+        category: "tool",
+        tags: ["パーティー", "ツール"]
+      },
+      {
+        title: "Dante",
+        desc: "ダンテ関連のインタラクティブ作品。",
+        path: "Code/dante/index.html",
+        icon: "📖",
+        category: "game",
+        tags: ["体験"]
+      },
+
+      // Racing
+      {
+        title: "HexGL",
+        desc: "本格的な3D未来型レーシングゲーム。WebGL製の本格作。",
+        path: "Code/HexGL/index.html",
+        icon: "🏎️",
+        category: "racing",
+        tags: ["3D", "レーシング"]
+      },
+      {
+        title: "Fake Racer",
+        desc: "クラシックな疑似3Dレーシングゲーム。OutRun風。",
+        path: "Code/fake-racer/index.html",
+        icon: "🏁",
+        category: "racing",
+        tags: ["レーシング"]
+      },
+
+      // Tools
+      {
+        title: "Music Player",
+        desc: "シンプルで使いやすい音楽プレイヤー。",
+        path: "Code/music-player/music-player.html",
+        icon: "🎵",
+        category: "tool",
+        tags: ["音楽"]
+      },
+      {
+        title: "Metronome",
+        desc: "練習に便利なメトロノーム。",
+        path: "Code/Metronome/Metronome.html",
+        icon: "⏱️",
+        category: "tool",
+        tags: ["音楽"]
+      },
+      {
+        title: "TTS Reader",
+        desc: "テキストを音声で読み上げるツール。",
+        path: "Code/tts-reader/tts-reader.html",
+        icon: "🗣️",
+        category: "tool",
+        tags: ["音声"]
+      },
+      {
+        title: "MP3 Cover Embedder",
+        desc: "MP3ファイルにカバー画像を埋め込むツール。",
+        path: "Code/mp3-cover-embedder/mp3-cover-embedder.html",
+        icon: "🖼️",
+        category: "tool",
+        tags: ["音楽"]
+      },
+      {
+        title: "Live Studio",
+        desc: "ライブ配信用のシンプルなスタジオツール。",
+        path: "Code/live-studio/live-studio.html",
+        icon: "📡",
+        category: "tool",
+        tags: ["配信"]
+      },
+      {
+        title: "Tally Recorder",
+        desc: "カウントや集計を記録するツール。",
+        path: "Code/tally-recorder/tally-recorder.html",
+        icon: "📊",
+        category: "tool",
+        tags: ["記録"]
+      },
+      {
+        title: "Encryption and Recovery",
+        desc: "暗号化と復元を行うツール。",
+        path: "Code/Encryption and Recovery/Encryption and Recovery.html",
+        icon: "🔐",
+        category: "tool",
+        tags: ["セキュリティ"]
+      }
+    ];
+
+    const grid = document.getElementById("grid");
+    const searchInput = document.getElementById("search");
+    const filterBtns = document.querySelectorAll(".filter-btn");
+    const totalCountEl = document.getElementById("total-count");
+    const visibleCountEl = document.getElementById("visible-count");
+
+    let currentFilter = "all";
+    let currentSearch = "";
+
+    totalCountEl.textContent = items.length;
+
+    function render() {
+      const filtered = items.filter(item => {
+        const matchFilter = currentFilter === "all" || item.category === currentFilter;
+        const q = currentSearch.toLowerCase();
+        const matchSearch = !q ||
+          item.title.toLowerCase().includes(q) ||
+          item.desc.toLowerCase().includes(q) ||
+          (item.tags && item.tags.some(t => t.toLowerCase().includes(q)));
+        return matchFilter && matchSearch;
+      });
+
+      visibleCountEl.textContent = filtered.length;
+
+      grid.innerHTML = filtered.map(item => `
+        <a class="card" href="${item.path}" target="_blank" rel="noopener"
+           data-category="${item.category}">
+          <div class="card-icon">${item.icon}</div>
+          <div class="card-title">${item.title}</div>
+          <div class="card-desc">${item.desc}</div>
+          <span class="card-tag">${categoryLabel(item.category)}</span>
+        </a>
+      `).join("");
+    }
+
+    function categoryLabel(cat) {
+      return {
+        game: "ゲーム",
+        puzzle: "パズル",
+        racing: "レーシング",
+        tool: "ツール"
+      }[cat] || cat;
+    }
+
+    searchInput.addEventListener("input", e => {
+      currentSearch = e.target.value;
+      render();
+    });
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        filterBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.dataset.filter;
+        render();
+      });
+    });
+
+    render();
+  </script>
+</body>
+</html>
