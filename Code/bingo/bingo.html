@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>みんなでビンゴ</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; min-height:100%;
+    background:radial-gradient(circle at 20% 0%, #102a3d 0%, transparent 45%),
+               radial-gradient(circle at 100% 100%, #3a1550 0%, transparent 40%), #0f0c18;
+    color:#f5f0ff;
+    font-family:-apple-system,"Hiragino Sans","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; align-items:center;
+    padding:30px 16px 60px;
+  }
+  a.back{ align-self:flex-start; color:#a89fc4; text-decoration:none; font-size:0.85rem; margin-bottom:10px;}
+  h1{
+    font-size:2.1rem; margin:0 0 4px;
+    background:linear-gradient(120deg,#7cd8ff,#ffd166);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  p.sub{ color:#a89fc4; margin:0 0 22px; font-size:0.88rem;}
+
+  .layout{
+    width:100%; max-width:920px;
+    display:flex; gap:24px; flex-wrap:wrap; justify-content:center;
+  }
+
+  .caller-panel{
+    flex:1 1 320px;
+    background:#1c1729; border:1px solid #ffffff14; border-radius:22px;
+    padding:30px; text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:18px;
+    min-height:340px; justify-content:center;
+  }
+  #bigNumber{
+    font-size:5.5rem; font-weight:900; line-height:1;
+    color:#ffd166;
+    text-shadow:0 0 40px #ffd16655;
+  }
+  #callLabel{ color:#7a6f96; font-size:0.85rem; letter-spacing:0.1em;}
+  .btn-row{ display:flex; gap:12px; margin-top:10px; }
+  button{
+    font-size:1rem; font-weight:700; border:none; border-radius:14px;
+    padding:14px 26px; cursor:pointer; transition:transform .12s ease;
+  }
+  button:active{ transform:scale(0.95); }
+  #callBtn{ background:linear-gradient(120deg,#7cd8ff,#ffd166); color:#101018; padding:16px 40px; font-size:1.1rem;}
+  #resetBtn{ background:#2a2438; color:#e6dcff; }
+  #remain{ font-size:0.85rem; color:#a89fc4; }
+
+  .board-panel{
+    flex:1 1 380px;
+    background:#1c1729; border:1px solid #ffffff14; border-radius:22px;
+    padding:20px;
+  }
+  .board-panel h3{ margin:0 0 12px; font-size:0.9rem; color:#cfc3ea; font-weight:600; }
+  .num-grid{
+    display:grid;
+    grid-template-columns:repeat(10, 1fr);
+    gap:5px;
+  }
+  .num-cell{
+    aspect-ratio:1/1;
+    display:flex; align-items:center; justify-content:center;
+    background:#0f0c18; border-radius:6px;
+    font-size:0.7rem; color:#5c5279;
+    border:1px solid #ffffff0f;
+  }
+  .num-cell.called{
+    background:linear-gradient(120deg,#ff5c8a,#ffd166);
+    color:#1a1220; font-weight:800;
+  }
+  .rangeSelect{ margin-bottom:14px; display:flex; gap:8px; align-items:center; font-size:0.85rem; color:#cfc3ea;}
+  select{
+    background:#0f0c18; border:1px solid #ffffff22; border-radius:8px;
+    color:#f5f0ff; padding:6px 10px; font-size:0.9rem;
+  }
+  footer{ margin-top:30px; color:#7a6f96; font-size:0.75rem; text-align:center; max-width:520px; line-height:1.7;}
+</style>
+</head>
+<body>
+  <a class="back" href="index.html">← ゲーム一覧</a>
+  <h1>🎱 みんなでビンゴ</h1>
+  <p class="sub">紙のビンゴカードを配って、この画面が番号読み上げ係になります</p>
+
+  <div class="layout">
+    <div class="caller-panel">
+      <div class="rangeSelect">
+        番号の範囲:
+        <select id="rangeSelect">
+          <option value="50">1〜50(少人数向け)</option>
+          <option value="75" selected>1〜75(定番)</option>
+          <option value="90">1〜90(大人数向け)</option>
+        </select>
+      </div>
+      <div id="callLabel">次の番号</div>
+      <div id="bigNumber">–</div>
+      <div id="remain">75個中 0個 抽選済み</div>
+      <div class="btn-row">
+        <button id="callBtn">番号を引く</button>
+        <button id="resetBtn">リセット</button>
+      </div>
+    </div>
+
+    <div class="board-panel">
+      <h3>これまで出た番号</h3>
+      <div class="num-grid" id="numGrid"></div>
+    </div>
+  </div>
+
+  <footer>ビンゴカードは各自紙に5×5マスを書いて、好きな数字を自由に記入して用意してください。番号が呼ばれたらマスに丸をつけ、縦・横・斜めが揃ったら「ビンゴ!」</footer>
+
+<script>
+(function(){
+  const rangeSelect = document.getElementById('rangeSelect');
+  const bigNumber = document.getElementById('bigNumber');
+  const callLabel = document.getElementById('callLabel');
+  const remainEl = document.getElementById('remain');
+  const numGrid = document.getElementById('numGrid');
+  const callBtn = document.getElementById('callBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  let maxNum = 75;
+  let pool = [];
+  let called = [];
+
+  function buildGrid(){
+    numGrid.innerHTML = '';
+    numGrid.style.gridTemplateColumns = maxNum > 50 ? 'repeat(10,1fr)' : 'repeat(10,1fr)';
+    for(let i=1;i<=maxNum;i++){
+      const d = document.createElement('div');
+      d.className = 'num-cell';
+      d.id = 'n'+i;
+      d.textContent = i;
+      numGrid.appendChild(d);
+    }
+  }
+
+  function reset(){
+    maxNum = parseInt(rangeSelect.value,10);
+    pool = [];
+    for(let i=1;i<=maxNum;i++) pool.push(i);
+    called = [];
+    bigNumber.textContent = '–';
+    callLabel.textContent = '次の番号';
+    remainEl.textContent = `${maxNum}個中 0個 抽選済み`;
+    buildGrid();
+  }
+
+  callBtn.addEventListener('click', ()=>{
+    if(pool.length === 0){
+      callLabel.textContent = 'すべて出ました！';
+      return;
+    }
+    const idx = Math.floor(Math.random()*pool.length);
+    const n = pool.splice(idx,1)[0];
+    called.push(n);
+    bigNumber.textContent = n;
+    callLabel.textContent = `${called.length}個目`;
+    remainEl.textContent = `${maxNum}個中 ${called.length}個 抽選済み`;
+    const cell = document.getElementById('n'+n);
+    if(cell) cell.classList.add('called');
+  });
+
+  resetBtn.addEventListener('click', reset);
+  rangeSelect.addEventListener('change', reset);
+
+  reset();
+})();
+</script>
+</body>
+</html>
