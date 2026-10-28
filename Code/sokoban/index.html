@@ -1,0 +1,56 @@
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="p5.min.js"></script>
+    <script src="index.js"></script>
+    <script src="lib/utils.js"></script>
+    <script src="lib/draw.js"></script>
+    <script src="lib/level.js"></script>
+    <script src="lib/pathfinder.js"></script>
+    <script src="lib/playerControls.js"></script>
+    <script src="lib/optimizer.js"></script>
+    <script src="lib/generator.js"></script>
+    <title>Sokoban lvl generator</title>
+</head>
+
+<body>
+
+    <div>
+        <div class="title">
+        <h1>Sokoban Random Level Generator </h1>
+        <h3>Generate a random level and solve it</h3>
+    </div>
+    </div>
+
+    <div class="container">
+        <div class="instructions buttonbox">
+            <div id="buttoncontainer">
+                <br>
+                <button id="generateButton" class="btn" color="white" onClick="randomLevel()">
+                    <b>Generate Random</b></button>
+                <br>
+                <button id="optimizeButton" class="btn" color="white" onClick="optimize(500)">
+                    <b>Optimize Level</b></button>
+            </div>
+
+            <div class="slideContainer">
+                <div id="sizeTxt" style="color: rgb(255, 255, 255)">size of level</div>
+                <input type="range" min="7" max="20" value="10" class="slider" id="sizeSlider"
+                    onchange="displayHtmlValues()">
+
+                <div id="boxTxt" style="color: rgb(255, 255, 255)">number of boxes</div>
+                <input type="range" min="1" max="10" value="3" class="slider" id="numSlider"
+                    onchange="displayHtmlValues()">
+            </div>
+        </div>
+
+        <div id="canvas1" class="canv"></div>
+        <img src="assets/instructions.jpg" alt="move: arrowkeys; next Level: enter; revert step: z"
+            class="instructions">
+    </div>
+    </div>
+</body>
+
+</html>

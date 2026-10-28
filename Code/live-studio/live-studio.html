@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Live Studio — 高画質・高音質プレビュー</title>
+<style>
+:root{color-scheme:dark;--bg:#080b12;--panel:#111827;--panel2:#0c1220;--line:#273247;--text:#edf3ff;--muted:#9ba9bf;--accent:#62e6c4;--blue:#7aa7ff;--danger:#ff7185}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#17233a 0,#080b12 52%);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+main{width:min(1180px,100% - 32px);margin:0 auto;padding:34px 0 48px}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--blue));color:#081018;font-weight:900;font-size:22px}.eyebrow{font-size:11px;letter-spacing:.17em;color:var(--accent);font-weight:800}.brand h1{font-size:21px;margin:1px 0 0}.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}.dot{width:8px;height:8px;border-radius:50%;background:#64748b}.dot.live{background:#ff405f;box-shadow:0 0 12px #ff405f}
+.intro{margin-bottom:22px}.intro h2{font-size:clamp(25px,4vw,38px);line-height:1.15;margin:0 0 10px;letter-spacing:-.035em}.intro p{margin:0;color:var(--muted);max-width:720px}
+.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.85fr);gap:18px}.panel{background:linear-gradient(180deg,#121b2b,#0d1421);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 18px 55px #0003}.preview-head{padding:15px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}.preview-head strong{font-size:14px}.preview-head-right{display:flex;align-items:center;gap:10px}.live-label{font-size:11px;letter-spacing:.08em;color:#ff8090;font-weight:800}.fs-btn{appearance:none;border:1px solid #344158;background:#0a101b;color:#c6d1e3;border-radius:9px;padding:6px 10px;font:600 12px system-ui;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:border-color .15s,background .15s}.fs-btn:hover{border-color:var(--accent);color:var(--text)}.fs-btn svg{width:14px;height:14px;flex-shrink:0}.screen{position:relative;background:#03060b;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden}video{display:block;width:100%;height:100%;object-fit:contain;background:#03060b}.placeholder{position:absolute;text-align:center;padding:22px;color:var(--muted);pointer-events:none}.placeholder svg{width:48px;height:48px;opacity:.8;margin-bottom:12px}.placeholder b{display:block;color:var(--text);font-size:17px;margin-bottom:5px}.placeholder span{font-size:13px}.screen.active .placeholder{display:none}.screen-foot{display:flex;gap:10px;flex-wrap:wrap;padding:14px 16px;border-top:1px solid var(--line)}.metric{background:#0a101b;border:1px solid #202c40;border-radius:11px;padding:9px 12px;min-width:100px;flex:1}.metric span{display:block;color:var(--muted);font-size:11px}.metric strong{font-size:15px;font-variant-numeric:tabular-nums}
+.screen:fullscreen,.screen:-webkit-full-screen{aspect-ratio:auto;width:100%;height:100%;background:#000;border-radius:0}
+.screen:fullscreen video,.screen:-webkit-full-screen video{object-fit:contain}
+.screen:fullscreen .fs-overlay,.screen:-webkit-full-screen .fs-overlay{display:flex}
+.fs-overlay{display:none;position:absolute;inset:0;pointer-events:none;z-index:2}
+.fs-overlay .fs-exit{pointer-events:auto;position:absolute;top:16px;right:16px;appearance:none;border:1px solid #ffffff33;background:#00000088;backdrop-filter:blur(8px);color:#fff;border-radius:10px;padding:10px 14px;font:600 13px system-ui;cursor:pointer;display:inline-flex;align-items:center;gap:8px;opacity:0;transition:opacity .2s}
+.screen:fullscreen:hover .fs-exit,.screen:-webkit-full-screen:hover .fs-exit,.fs-overlay:focus-within .fs-exit{opacity:1}
+.fs-hint{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#00000088;backdrop-filter:blur(8px);color:#ffffffcc;font-size:12px;padding:8px 14px;border-radius:999px;opacity:0;transition:opacity .3s;pointer-events:none}
+.screen:fullscreen .fs-hint.show,.screen:-webkit-full-screen .fs-hint.show{opacity:1}
+.controls{padding:18px}.controls h3{font-size:15px;margin:0 0 15px}.field{margin-bottom:15px}.field label{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:7px;color:#d8e2f2}.field small{color:var(--muted);font-size:11px}.field select{width:100%;background:#090f1b;color:var(--text);border:1px solid #344158;border-radius:10px;padding:11px 12px;font:inherit;outline:none}.field select:focus{border-color:var(--accent)}.toggles{display:grid;gap:10px;margin:8px 0 18px}.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#c6d1e3;font-size:13px}.toggle input{appearance:none;width:38px;height:22px;border-radius:20px;background:#364155;position:relative;cursor:pointer;flex-shrink:0;transition:.2s}.toggle input:before{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s}.toggle input:checked{background:#32bfa1}.toggle input:checked:before{transform:translateX(16px)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}.btn{border:0;border-radius:11px;padding:12px 14px;font:700 14px system-ui;cursor:pointer;transition:transform .15s,opacity .15s}.btn:active{transform:scale(.98)}.primary{background:linear-gradient(110deg,var(--accent),#9bf3d9);color:#062019}.secondary{background:#202b3e;color:#e7eefb;border:1px solid #344158}.btn:disabled{opacity:.45;cursor:not-allowed}.message{min-height:36px;color:var(--muted);font-size:12px;margin:13px 0 0;overflow-wrap:anywhere}.message.error{color:var(--danger)}.notice{margin-top:18px;padding:14px 16px;border:1px solid #27364c;background:#0c1422;border-radius:14px;color:var(--muted);font-size:12px}.notice strong{color:#dce8fb}.notice ul{padding-left:18px;margin:7px 0 0}.notice li{margin:4px 0}.notice kbd{display:inline-block;padding:1px 6px;border:1px solid #3a4a63;border-radius:5px;background:#121a28;color:#dce8fb;font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(max-width:800px){main{width:min(100% - 20px,680px);padding-top:22px}.layout{grid-template-columns:1fr}.intro h2{font-size:29px}.controls{padding:16px}.status{font-size:11px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="brand"><div class="logo">L</div><div><div class="eyebrow">LOCAL LIVE STUDIO</div><h1>Live Studio</h1></div></div>
+  <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">停止中</span></div>
+</header>
+<section class="intro">
+  <h2>Webカメラを、できるだけ高画質・高音質で。</h2>
+  <p>カメラ映像とマイク音声をブラウザー上でリアルタイム再生。対応機器が許す範囲で高解像度・高フレームレート・高サンプルレートを要求します。</p>
+</section>
+<div class="layout">
+  <section class="panel">
+    <div class="preview-head">
+      <strong>ライブプレビュー</strong>
+      <div class="preview-head-right">
+        <span class="live-label" id="liveLabel">● OFFLINE</span>
+        <button type="button" class="fs-btn" id="fullscreenBtn" title="フルスクリーン (F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          <span id="fsBtnLabel">フルスクリーン</span>
+        </button>
+      </div>
+    </div>
+    <div class="screen" id="screen">
+      <video id="video" playsinline autoplay></video>
+      <div class="placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></svg>
+        <b>ライブ映像はここに表示されます</b><span>設定を選び「ライブ開始」を押してください</span>
+      </div>
+      <div class="fs-overlay">
+        <button type="button" class="fs-exit" id="fsExitBtn" title="フルスクリーン解除 (Esc)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+          解除
+        </button>
+        <div class="fs-hint" id="fsHint">Esc または 解除ボタンで戻る</div>
+      </div>
+    </div>
+    <div class="screen-foot">
+      <div class="metric"><span>映像解像度</span><strong id="resolution">—</strong></div>
+      <div class="metric"><span>フレームレート</span><strong id="fps">—</strong></div>
+      <div class="metric"><span>音声サンプルレート</span><strong id="sampleRate">—</strong></div>
+    </div>
+  </section>
+  <aside class="panel controls">
+    <h3>キャプチャ設定</h3>
+    <div class="field"><label for="quality">映像品質</label><select id="quality"><option value="2160">4K UHD（3840×2160を要求）</option><option value="1440">1440p（2560×1440を要求）</option><option value="1080" selected>Full HD（1920×1080を要求）</option><option value="720">HD（1280×720を要求）</option><option value="max">機器の最大品質を要求</option></select></div>
+    <div class="field"><label for="frameRate">フレームレート</label><select id="frameRate"><option value="60" selected>60 FPSを要求</option><option value="30">30 FPSを要求</option><option value="120">120 FPSを要求</option></select></div>
+    <div class="field"><label for="audioRate">音声サンプルレート</label><select id="audioRate"><option value="96000">96 kHzを要求</option><option value="48000" selected>48 kHzを要求</option><option value="44100">44.1 kHzを要求</option></select></div>
+    <div class="field"><label for="camera">カメラ</label><select id="camera"><option value="">既定のカメラ</option></select></div>
+    <div class="field"><label for="microphone">マイク</label><select id="microphone"><option value="">既定のマイク</option></select></div>
+    <div class="toggles">
+      <label class="toggle">音声のライブ再生 <input id="monitor" type="checkbox" checked></label>
+      <label class="toggle">ノイズ抑制を無効化 <input id="noise" type="checkbox" checked></label>
+      <label class="toggle">エコーキャンセルを無効化 <input id="echo" type="checkbox" checked></label>
+      <label class="toggle">自動音量調整を無効化 <input id="gain" type="checkbox" checked></label>
+    </div>
+    <div class="actions"><button class="btn primary" id="start">ライブ開始</button><button class="btn secondary" id="stop" disabled>停止</button></div>
+    <p class="message" id="message" role="status">開始すると、カメラとマイクへのアクセス許可を求めます。</p>
+  </aside>
+</div>
+<div class="notice"><strong>品質について</strong>
+  <ul>
+    <li>4K・120 FPS・96 kHzは「要求値」です。実際の品質はカメラ、マイク、PC、ブラウザーが対応する範囲に制限されます。</li>
+    <li>このページは端末内で映像・音声を再生します。配信サーバーへの送信や、インターネット上への公開は行いません。</li>
+    <li>マイク音声をスピーカーで再生すると、ハウリングやエコーが発生することがあります。音声再生にはヘッドホンをおすすめします。</li>
+    <li>カメラ・マイクへのアクセスにはHTTPSまたはlocalhostが必要です。HTMLファイルを直接開く場合、ブラウザーによっては動作しないことがあります。</li>
+    <li>プレビュー右上の「フルスクリーン」またはキー <kbd>F</kbd> で映像をフルディスプレイ表示できます。解除は <kbd>Esc</kbd> です。</li>
+  </ul>
+</div>
+</main>
+<script>
+const video = document.getElementById('video');
+const screen = document.getElementById('screen');
+const startButton = document.getElementById('start');
+const stopButton = document.getElementById('stop');
+const message = document.getElementById('message');
+const cameraSelect = document.getElementById('camera');
+const micSelect = document.getElementById('microphone');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const fsBtnLabel = document.getElementById('fsBtnLabel');
+const fsExitBtn = document.getElementById('fsExitBtn');
+const fsHint = document.getElementById('fsHint');
+let stream = null;
+let fsHintTimer = null;
+
+function setMessage(text, error = false) {
+  message.textContent = text;
+  message.classList.toggle('error', error);
+}
+
+function setLive(live) {
+  document.getElementById('statusDot').classList.toggle('live', live);
+  document.getElementById('statusText').textContent = live ? 'ライブ中' : '停止中';
+  document.getElementById('liveLabel').textContent = live ? '● LIVE' : '● OFFLINE';
+  screen.classList.toggle('active', live);
+  startButton.disabled = live;
+  stopButton.disabled = !live;
+}
+
+function selectedDevice(select) {
+  return select.value ? { deviceId: { exact: select.value } } : {};
+}
+
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+
+function updateFsUI() {
+  const on = isFullscreen();
+  fsBtnLabel.textContent = on ? '解除' : 'フルスクリーン';
+  fullscreenBtn.title = on ? 'フルスクリーン解除 (Esc)' : 'フルスクリーン (F)';
+}
+
+async function enterFullscreen() {
+  const el = screen;
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+    else {
+      setMessage('このブラウザーではフルスクリーンに対応していません。', true);
+      return;
+    }
+    fsHint.classList.add('show');
+    clearTimeout(fsHintTimer);
+    fsHintTimer = setTimeout(() => fsHint.classList.remove('show'), 2800);
+  } catch (err) {
+    setMessage('フルスクリーンを開始できませんでした。', true);
+  }
+}
+
+async function exitFullscreen() {
+  try {
+    if (document.exitFullscreen) await document.exitFullscreen();
+    else if (document.webkitExitFullscreen) await document.webkitExitFullscreen();
+  } catch (_) {}
+}
+
+function toggleFullscreen() {
+  if (isFullscreen()) exitFullscreen();
+  else enterFullscreen();
+}
+
+async function populateDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const keepCamera = cameraSelect.value;
+    const keepMic = micSelect.value;
+    cameraSelect.replaceChildren(new Option('既定のカメラ', ''));
+    micSelect.replaceChildren(new Option('既定のマイク', ''));
+    devices.filter(d => d.kind === 'videoinput').forEach((d, i) => cameraSelect.add(new Option(d.label || `カメラ ${i + 1}`, d.deviceId)));
+    devices.filter(d => d.kind === 'audioinput').forEach((d, i) => micSelect.add(new Option(d.label || `マイク ${i + 1}`, d.deviceId)));
+    if ([...cameraSelect.options].some(o => o.value === keepCamera)) cameraSelect.value = keepCamera;
+    if ([...micSelect.options].some(o => o.value === keepMic)) micSelect.value = keepMic;
+  } catch (_) {}
+}
+
+async function startLive() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setMessage('このブラウザーではカメラ機能を利用できません。HTTPSまたはlocalhostで開き、対応ブラウザーを使用してください。', true);
+    return;
+  }
+  startButton.disabled = true;
+  setMessage('カメラとマイクに接続しています…');
+  const preset = document.getElementById('quality').value;
+  const sizes = {
+    '2160': { width: 3840, height: 2160 },
+    '1440': { width: 2560, height: 1440 },
+    '1080': { width: 1920, height: 1080 },
+    '720': { width: 1280, height: 720 },
+    'max': { width: 7680, height: 4320 }
+  };
+  const size = sizes[preset];
+  const fps = Number(document.getElementById('frameRate').value);
+  const sampleRate = Number(document.getElementById('audioRate').value);
+  const audio = {
+    ...selectedDevice(micSelect),
+    sampleRate: { ideal: sampleRate },
+    channelCount: { ideal: 2 },
+    noiseSuppression: !document.getElementById('noise').checked,
+    echoCancellation: !document.getElementById('echo').checked,
+    autoGainControl: !document.getElementById('gain').checked
+  };
+  const videoConstraints = {
+    ...selectedDevice(cameraSelect),
+    width: { ideal: size.width },
+    height: { ideal: size.height },
+    frameRate: { ideal: fps }
+  };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio });
+    video.srcObject = stream;
+    video.muted = !document.getElementById('monitor').checked;
+    await video.play();
+    setLive(true);
+    const vt = stream.getVideoTracks()[0];
+    const at = stream.getAudioTracks()[0];
+    const vs = vt?.getSettings?.() || {};
+    const as = at?.getSettings?.() || {};
+    document.getElementById('resolution').textContent = vs.width && vs.height ? `${vs.width} × ${vs.height}` : '取得不可';
+    document.getElementById('fps').textContent = vs.frameRate ? `${Math.round(vs.frameRate)} FPS` : '取得不可';
+    document.getElementById('sampleRate').textContent = as.sampleRate ? `${as.sampleRate / 1000} kHz` : '取得不可';
+    const warnings = [];
+    if (vs.width && vs.width < size.width) warnings.push('映像は機器の対応範囲で取得されました');
+    if (vs.frameRate && vs.frameRate < fps) warnings.push('FPSは機器の対応範囲で取得されました');
+    if (as.sampleRate && as.sampleRate < sampleRate) warnings.push('音声サンプルレートは機器の対応範囲です');
+    setMessage(warnings.join('。') || 'ライブ再生中です。実際に取得できた品質を下に表示しています。');
+    await populateDevices();
+    stream.getTracks().forEach(track => track.addEventListener('ended', () => stopLive()));
+  } catch (err) {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    video.srcObject = null;
+    setLive(false);
+    const reasons = {
+      NotAllowedError: 'カメラ・マイクのアクセスが拒否されました。ブラウザーのサイト設定で許可してください。',
+      NotFoundError: '利用できるカメラまたはマイクが見つかりません。',
+      NotReadableError: 'カメラまたはマイクを使用できません。他のアプリで使用中でないか確認してください。',
+      OverconstrainedError: '選択した機器または設定に対応していません。別の品質や機器を選んでください。',
+      SecurityError: 'セキュリティ制限によりアクセスできません。HTTPSまたはlocalhostで開いてください。'
+    };
+    setMessage(reasons[err.name] || `開始できませんでした: ${err.message || err.name}`, true);
+  } finally {
+    if (!stream) startButton.disabled = false;
+  }
+}
+
+function stopLive() {
+  if (stream) stream.getTracks().forEach(track => track.stop());
+  stream = null;
+  video.pause();
+  video.srcObject = null;
+  document.getElementById('resolution').textContent = '—';
+  document.getElementById('fps').textContent = '—';
+  document.getElementById('sampleRate').textContent = '—';
+  setLive(false);
+  setMessage('停止しました。');
+}
+
+document.getElementById('monitor').addEventListener('change', e => {
+  video.muted = !e.target.checked;
+  if (e.target.checked && stream) {
+    video.play().catch(() => setMessage('音声を再生するには、ページ上で再生操作をしてください。', true));
+  }
+});
+startButton.addEventListener('click', startLive);
+stopButton.addEventListener('click', stopLive);
+cameraSelect.addEventListener('change', () => { if (stream) { stopLive(); setMessage('カメラを変更しました。「ライブ開始」を押してください。'); } });
+micSelect.addEventListener('change', () => { if (stream) { stopLive(); setMessage('マイクを変更しました。「ライブ開始」を押してください。'); } });
+fullscreenBtn.addEventListener('click', toggleFullscreen);
+fsExitBtn.addEventListener('click', exitFullscreen);
+video.addEventListener('dblclick', toggleFullscreen);
+document.addEventListener('fullscreenchange', updateFsUI);
+document.addEventListener('webkitfullscreenchange', updateFsUI);
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, select, textarea, button')) return;
+  if (e.key === 'f' || e.key === 'F') {
+    e.preventDefault();
+    toggleFullscreen();
+  }
+});
+navigator.mediaDevices?.addEventListener?.('devicechange', populateDevices);
+populateDevices();
+updateFsUI();
+</script>
+</body>
+</html>

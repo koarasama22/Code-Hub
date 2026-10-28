@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自然なテキスト読み上げ</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242836;
+      --border: #2e3345;
+      --text: #e8eaf0;
+      --text-muted: #9aa3b5;
+      --primary: #6c8cff;
+      --primary-hover: #8aa4ff;
+      --accent: #5eead4;
+      --danger: #f87171;
+      --success: #4ade80;
+      --radius: 14px;
+      --shadow: 0 8px 32px rgba(0,0,0,0.35);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      background-image:
+        radial-gradient(ellipse at 20% 0%, rgba(108,140,255,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 100%, rgba(94,234,212,0.08) 0%, transparent 50%);
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff 0%, var(--primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-top: 8px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow);
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      letter-spacing: 0.02em;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 1rem;
+      padding: 16px;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.7;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    textarea::placeholder {
+      color: #5a6278;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .controls-grid { grid-template-columns: 1fr; }
+    }
+
+    select, input[type="range"] {
+      width: 100%;
+    }
+
+    select {
+      appearance: none;
+      background: var(--surface2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aa3b5' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 14px center;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 12px 40px 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slider-row input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .slider-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      background: var(--primary);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 0 4px rgba(108,140,255,0.2);
+      transition: transform 0.15s;
+    }
+
+    .slider-row input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .slider-value {
+      min-width: 42px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-secondary {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: #2c3142; }
+
+    .btn-danger {
+      background: rgba(248,113,113,0.15);
+      color: var(--danger);
+      border: 1px solid rgba(248,113,113,0.3);
+    }
+    .btn-danger:hover { background: rgba(248,113,113,0.25); }
+
+    .btn-accent {
+      background: rgba(94,234,212,0.12);
+      color: var(--accent);
+      border: 1px solid rgba(94,234,212,0.3);
+    }
+    .btn-accent:hover { background: rgba(94,234,212,0.22); }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--surface2);
+      border-radius: 10px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 16px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #5a6278;
+      flex-shrink: 0;
+    }
+
+    .status.playing .status-dot {
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .status.paused .status-dot {
+      background: #fbbf24;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .preset-btn {
+      font-size: 0.8rem;
+      padding: 7px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 20px;
+    }
+    .preset-btn:hover, .preset-btn.active {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: rgba(108,140,255,0.1);
+    }
+
+    .char-count {
+      text-align: right;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .tips {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .tips strong { color: var(--text); }
+
+    footer {
+      text-align: center;
+      margin-top: 32px;
+      font-size: 0.8rem;
+      color: #5a6278;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>自然なテキスト読み上げ</h1>
+      <p>ブラウザだけで動く・高品質TTSリーダー</p>
+    </header>
+
+    <div class="card">
+      <label for="text">読み上げるテキスト</label>
+      <textarea id="text" placeholder="ここに読み上げたい文章を貼り付けてください…&#10;&#10;例：こんにちは。今日はいい天気ですね。少し散歩にでも行きませんか？">こんにちは。今日はいい天気ですね。少し散歩にでも行きませんか？ このツールはブラウザの音声合成を使って、自然な読み上げを目指しています。</textarea>
+      <div class="char-count"><span id="charCount">0</span> 文字</div>
+    </div>
+
+    <div class="card">
+      <div class="controls-grid">
+        <div>
+          <label for="voice">声（ボイス）</label>
+          <select id="voice"></select>
+        </div>
+        <div>
+          <label>性別フィルター</label>
+          <div class="presets" id="genderFilter">
+            <button type="button" class="preset-btn active" data-gender="all">すべて</button>
+            <button type="button" class="preset-btn" data-gender="female">女性</button>
+            <button type="button" class="preset-btn" data-gender="male">男性</button>
+            <button type="button" class="preset-btn" data-gender="ja">日本語優先</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <label>読み上げスピード <span class="slider-value" id="rateVal">1.00</span></label>
+        <div class="slider-row">
+          <input type="range" id="rate" min="0.5" max="2.0" step="0.05" value="1.0">
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <label>ピッチ（声の高さ） <span class="slider-value" id="pitchVal">1.00</span></label>
+        <div class="slider-row">
+          <input type="range" id="pitch" min="0.5" max="1.5" step="0.05" value="1.0">
+        </div>
+      </div>
+
+      <div style="margin-top: 16px;">
+        <label>音量 <span class="slider-value" id="volumeVal">1.00</span></label>
+        <div class="slider-row">
+          <input type="range" id="volume" min="0" max="1" step="0.05" value="1.0">
+        </div>
+      </div>
+
+      <div style="margin-top: 20px;">
+        <label>自然な読み上げプリセット</label>
+        <div class="presets" id="presets">
+          <button type="button" class="preset-btn" data-preset="natural">自然</button>
+          <button type="button" class="preset-btn" data-preset="slow">ゆっくり丁寧</button>
+          <button type="button" class="preset-btn" data-preset="news">ニュース風</button>
+          <button type="button" class="preset-btn" data-preset="story">物語風</button>
+          <button type="button" class="preset-btn" data-preset="fast">早口</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="btn-row">
+        <button type="button" class="btn-primary" id="playBtn">▶ 再生</button>
+        <button type="button" class="btn-secondary" id="pauseBtn" disabled>⏸ 一時停止</button>
+        <button type="button" class="btn-secondary" id="resumeBtn" disabled>⏵ 再開</button>
+        <button type="button" class="btn-danger" id="stopBtn" disabled>■ 停止</button>
+        <button type="button" class="btn-accent" id="testBtn">テスト再生（短文）</button>
+      </div>
+
+      <div class="status" id="status">
+        <span class="status-dot"></span>
+        <span id="statusText">準備完了 — テキストを入力して再生してください</span>
+      </div>
+    </div>
+
+    <div class="card tips">
+      <strong>使い方のヒント</strong><br>
+      ・「日本語優先」を選ぶと、日本語対応ボイスが上に並びます。<br>
+      ・句点（。）や読点（、）があると自然に間が空きます。長い文章は段落ごとに分けるとより自然です。<br>
+      ・「自然」プリセットはスピード0.95・ピッチ1.0で、落ち着いた読み上げになります。<br>
+      ・声の種類はお使いのOS・ブラウザによって異なります（Chrome / Edge / Safari 推奨）。
+    </div>
+
+    <footer>
+      Web Speech API を使用 · サーバー不要 · ローカル完結
+    </footer>
+  </div>
+
+  <script>
+    const textEl = document.getElementById('text');
+    const voiceEl = document.getElementById('voice');
+    const rateEl = document.getElementById('rate');
+    const pitchEl = document.getElementById('pitch');
+    const volumeEl = document.getElementById('volume');
+    const rateVal = document.getElementById('rateVal');
+    const pitchVal = document.getElementById('pitchVal');
+    const volumeVal = document.getElementById('volumeVal');
+    const charCount = document.getElementById('charCount');
+    const statusEl = document.getElementById('status');
+    const statusText = document.getElementById('statusText');
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const testBtn = document.getElementById('testBtn');
+
+    let voices = [];
+    let currentUtterance = null;
+    let isPaused = false;
+    let genderFilter = 'all';
+
+    function updateCharCount() {
+      charCount.textContent = textEl.value.length.toLocaleString();
+    }
+    textEl.addEventListener('input', updateCharCount);
+    updateCharCount();
+
+    function setStatus(state, msg) {
+      statusEl.className = 'status' + (state ? ' ' + state : '');
+      statusText.textContent = msg;
+    }
+
+    function updateButtons(playing, paused) {
+      playBtn.disabled = playing && !paused;
+      pauseBtn.disabled = !playing || paused;
+      resumeBtn.disabled = !paused;
+      stopBtn.disabled = !playing && !paused;
+    }
+
+    // 声のリスト取得
+    function loadVoices() {
+      voices = speechSynthesis.getVoices();
+      populateVoices();
+    }
+
+    function guessGender(name, lang) {
+      const n = (name || '').toLowerCase();
+      // 一般的な男性名パターン
+      if (/male|man|david|daniel|james|mark|paul|tom|kenji|hiroshi|takeshi|male|男性/.test(n)) return 'male';
+      // 女性
+      if (/female|woman|karen|samantha|victoria|zira|kyoko|haruka|ayumi|female|女性/.test(n)) return 'female';
+      // 日本語のよくある声
+      if (/google 日本語|microsoft haruka|microsoft ayumi|kyoko/.test(n)) return 'female';
+      if (/microsoft ichiro|otoya/.test(n)) return 'male';
+      return 'unknown';
+    }
+
+    function populateVoices() {
+      const prev = voiceEl.value;
+      voiceEl.innerHTML = '';
+
+      let filtered = voices.slice();
+
+      if (genderFilter === 'female') {
+        filtered = filtered.filter(v => guessGender(v.name, v.lang) === 'female');
+      } else if (genderFilter === 'male') {
+        filtered = filtered.filter(v => guessGender(v.name, v.lang) === 'male');
+      } else if (genderFilter === 'ja') {
+        // 日本語を優先してソート
+        filtered.sort((a, b) => {
+          const aJa = a.lang.startsWith('ja') ? 0 : 1;
+          const bJa = b.lang.startsWith('ja') ? 0 : 1;
+          return aJa - bJa || a.name.localeCompare(b.name);
+        });
+      }
+
+      if (filtered.length === 0) {
+        filtered = voices.slice();
+      }
+
+      filtered.forEach((v, i) => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        const gender = guessGender(v.name, v.lang);
+        const gLabel = gender === 'female' ? '♀ ' : gender === 'male' ? '♂ ' : '';
+        opt.textContent = `${gLabel}${v.name} (${v.lang})`;
+        voiceEl.appendChild(opt);
+      });
+
+      // 以前の選択をできるだけ復元
+      if (prev && [...voiceEl.options].some(o => o.value === prev)) {
+        voiceEl.value = prev;
+      } else {
+        // 日本語ボイスをデフォルトに
+        const ja = [...voiceEl.options].find(o => o.textContent.includes('ja') || o.value.toLowerCase().includes('japan'));
+        if (ja) voiceEl.value = ja.value;
+      }
+    }
+
+    // 性別フィルター
+    document.getElementById('genderFilter').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-gender]');
+      if (!btn) return;
+      document.querySelectorAll('#genderFilter .preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      genderFilter = btn.dataset.gender;
+      populateVoices();
+    });
+
+    // スライダー表示更新
+    rateEl.addEventListener('input', () => rateVal.textContent = parseFloat(rateEl.value).toFixed(2));
+    pitchEl.addEventListener('input', () => pitchVal.textContent = parseFloat(pitchEl.value).toFixed(2));
+    volumeEl.addEventListener('input', () => volumeVal.textContent = parseFloat(volumeEl.value).toFixed(2));
+
+    // プリセット
+    const presets = {
+      natural: { rate: 0.95, pitch: 1.0 },
+      slow:    { rate: 0.75, pitch: 1.0 },
+      news:    { rate: 1.05, pitch: 1.0 },
+      story:   { rate: 0.9,  pitch: 1.05 },
+      fast:    { rate: 1.35, pitch: 1.0 }
+    };
+
+    document.getElementById('presets').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-preset]');
+      if (!btn) return;
+      document.querySelectorAll('#presets .preset-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const p = presets[btn.dataset.preset];
+      rateEl.value = p.rate;
+      pitchEl.value = p.pitch;
+      rateVal.textContent = p.rate.toFixed(2);
+      pitchVal.textContent = p.pitch.toFixed(2);
+    });
+
+    function getSelectedVoice() {
+      const name = voiceEl.value;
+      return voices.find(v => v.name === name) || null;
+    }
+
+    function speak(text, isTest = false) {
+      if (!text.trim()) {
+        setStatus('', 'テキストを入力してください');
+        return;
+      }
+
+      speechSynthesis.cancel();
+      isPaused = false;
+
+      const utt = new SpeechSynthesisUtterance(text);
+      const voice = getSelectedVoice();
+      if (voice) utt.voice = voice;
+      utt.rate = parseFloat(rateEl.value);
+      utt.pitch = parseFloat(pitchEl.value);
+      utt.volume = parseFloat(volumeEl.value);
+      utt.lang = voice ? voice.lang : 'ja-JP';
+
+      utt.onstart = () => {
+        currentUtterance = utt;
+        setStatus('playing', isTest ? 'テスト再生中…' : '読み上げ中…');
+        updateButtons(true, false);
+      };
+
+      utt.onend = () => {
+        currentUtterance = null;
+        isPaused = false;
+        setStatus('', isTest ? 'テスト再生が終わりました' : '読み上げが完了しました');
+        updateButtons(false, false);
+      };
+
+      utt.onerror = (e) => {
+        if (e.error === 'interrupted') return;
+        setStatus('', 'エラー: ' + (e.error || '不明'));
+        updateButtons(false, false);
+      };
+
+      speechSynthesis.speak(utt);
+    }
+
+    playBtn.addEventListener('click', () => {
+      speak(textEl.value.trim());
+    });
+
+    pauseBtn.addEventListener('click', () => {
+      if (speechSynthesis.speaking && !speechSynthesis.paused) {
+        speechSynthesis.pause();
+        isPaused = true;
+        setStatus('paused', '一時停止中');
+        updateButtons(true, true);
+      }
+    });
+
+    resumeBtn.addEventListener('click', () => {
+      if (speechSynthesis.paused) {
+        speechSynthesis.resume();
+        isPaused = false;
+        setStatus('playing', '読み上げ中…');
+        updateButtons(true, false);
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      speechSynthesis.cancel();
+      currentUtterance = null;
+      isPaused = false;
+      setStatus('', '停止しました');
+      updateButtons(false, false);
+    });
+
+    testBtn.addEventListener('click', () => {
+      const samples = [
+        'こんにちは。これはテスト再生です。声の質とスピードを確認してください。',
+        '今日はいい天気ですね。少し散歩にでも行きませんか？',
+        '読み上げの自然さを確認するための短い文章です。'
+      ];
+      const sample = samples[Math.floor(Math.random() * samples.length)];
+      speak(sample, true);
+    });
+
+    // 初期化
+    if (speechSynthesis.onvoiceschanged !== undefined) {
+      speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    loadVoices();
+    // 一部ブラウザで遅れて声が来るため再試行
+    setTimeout(loadVoices, 300);
+    setTimeout(loadVoices, 1000);
+
+    // ページを離れるときに停止
+    window.addEventListener('beforeunload', () => speechSynthesis.cancel());
+  </script>
+</body>
+</html>
