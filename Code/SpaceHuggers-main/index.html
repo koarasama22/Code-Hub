@@ -1,31 +1,228 @@
+<!DOCTYPE html>
+<html lang="ja">
 <head>
-<title>Space Huggers</title>
-<link rel="icon" type="image/x-icon" href=".Other/favicon.ico"/>
-<meta name="title" content="Space Huggers">
-<meta name="author" content="Frank Force">
-<meta name="description" content="A run and gun roguelike platformer with destructible environments">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=0">
-<meta charset="utf-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自作コード一覧</title>
+<style>
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: #0f0c18;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: #f5f0ff;
+  font-family: -apple-system, "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+  background-color: #0f0c18;
+  background-image:
+    radial-gradient(ellipse at 15% 0%, rgba(58, 21, 80, 0.85) 0%, transparent 48%),
+    radial-gradient(ellipse at 100% 65%, rgba(13, 43, 61, 0.8) 0%, transparent 45%),
+    linear-gradient(180deg, #0f0c18 0%, #100d1b 50%, #0f0c18 100%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  padding: 48px 20px 60px;
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 2.6rem);
+  margin: 0 0 6px;
+  background: linear-gradient(120deg, #ffd166, #ff5c8a 50%, #7cd8ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+p.sub {
+  color: #b6a9d6;
+  margin: 0 0 44px;
+  text-align: center;
+  font-size: 0.95rem;
+  line-height: 1.8;
+}
+
+.section {
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto 38px;
+}
+
+.section h2 {
+  font-size: 1.05rem;
+  color: #cfc3ea;
+  margin: 0 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.6;
+}
+
+.section h2::before {
+  content: "";
+  display: block;
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: linear-gradient(120deg, #ffd166, #ff5c8a);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+a.card {
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  background: rgba(28, 23, 41, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 18px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  overflow-wrap: anywhere;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+a.card:hover {
+  transform: translateY(-4px);
+  background: rgba(36, 29, 54, 0.96);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+a.card:focus-visible {
+  outline: 2px solid #ffd166;
+  outline-offset: 4px;
+}
+
+.emoji {
+  font-size: 2.2rem;
+  line-height: 1.4;
+}
+
+.card h3 {
+  margin: 4px 0 0;
+  font-size: 1.15rem;
+  line-height: 1.5;
+}
+
+.card p {
+  margin: 0;
+  color: #b6accd;
+  font-size: 0.83rem;
+  line-height: 1.8;
+}
+
+.tag {
+  align-self: flex-start;
+  margin-top: 8px;
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e6dcff;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+
+footer {
+  margin: 20px auto 0;
+  color: #9185aa;
+  font-size: 0.75rem;
+  text-align: center;
+  line-height: 1.9;
+  max-width: 520px;
+}
+
+@media (max-width: 820px) {
+  body {
+    padding: 36px 18px 48px;
+    background-attachment: scroll;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  a.card {
+    padding: 20px;
+  }
+
+  p.sub {
+    margin-bottom: 36px;
+  }
+}
+
+@media (max-width: 520px) {
+  body {
+    padding: 30px 14px 40px;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  a.card {
+    padding: 20px;
+  }
+
+  .section {
+    margin-bottom: 32px;
+  }
+
+  p.sub {
+    font-size: 0.85rem;
+    margin-bottom: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a.card {
+    transition: none;
+  }
+
+  a.card:hover {
+    transform: none;
+  }
+}
+</style>
 </head>
 <body>
 
-<!-- Engine -->
-<script src=".Other/engine/engineUtil.js"></script>
-<script src=".Other/engine/engineDebug.js"></script>
-<script src=".Other/engine/engine.js"></script>
-<script src=".Other/engine/engineObject.js"></script>
-<script src=".Other/engine/engineWebGL.js"></script>
-<script src=".Other/engine/engineDraw.js"></script>
-<script src=".Other/engine/engineInput.js"></script>
-<script src=".Other/engine/engineAudio.js"></script>
-<script src=".Other/engine/engineTileLayer.js"></script>
-<script src=".Other/engine/engineParticle.js"></script>
+<h1>自作コード一覧</h1>
+<p class="sub">自作+公式に上がっているコードを利用した、コード実行ファイルです。</p>
 
-<!-- Game -->
-<script src=".Other/appObjects.js"></script>
-<script src=".Other/appCharacters.js"></script>
-<script src=".Other/appEffects.js"></script>
-<script src=".Other/appLevel.js"></script>
-<script src=".Other/app.js"></script>
+<div class="section">
+  <h2>みんなで遊ぶパーティーゲーム</h2>
+  <div class="grid">
+    <a class="card" href="Code/SpaceHuggers-main/index.html">
+      <div class="emoji">👾</div>
+      <h3>Space Huggers</h3>
+      <p>破壊可能な地形を撃ちまくる、ローグライク系ランガンプラットフォーマー。</p>
+      <span class="tag">1〜4人（パッド対応）</span>
+    </a>
+  </div>
+</div>
+
+<footer>
+  すべてオフラインで動作します。フォルダごと保存すれば、いつでもどこでも遊べます。<br>
+  TVに画面をミラーリング・接続すると、より盛り上がります。
+</footer>
 
 </body>
+</html>
