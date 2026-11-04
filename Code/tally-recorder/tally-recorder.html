@@ -327,6 +327,12 @@
           <span>マイク音声</span>
           <label class="switch"><input type="checkbox" id="micToggle"><span class="slider"></span></label>
         </div>
+        <div class="cam-row" id="micSelectRow" style="margin-top:8px; margin-bottom:8px;">
+          <select id="micSelect">
+            <option value="">既定のマイク</option>
+          </select>
+          <button type="button" id="btnRefreshMics" class="ghost" title="マイク一覧を更新">🔄</button>
+        </div>
         <div class="toggle-line">
           <span>システム音声（画面共有時）</span>
           <label class="switch"><input type="checkbox" id="sysToggle"><span class="slider"></span></label>
@@ -428,12 +434,12 @@
   }
   updateCameraGroupVisibility();
 
-  // ---- camera device list ----
+  // ---- camera / mic device list ----
   // Plain enumerateDevices() before/without a fresh permission grant often returns
   // only one generic entry (privacy protection), which is why a newly plugged-in
-  // camera can show up as a blank label. To get real labels for *all* cameras we
-  // briefly open a throwaway video stream (which forces the browser to resolve
-  // device labels for everything currently connected), then close it immediately.
+  // device can show up as a blank label. To get real labels we briefly open a
+  // throwaway stream (which forces the browser to resolve device labels), then
+  // close it immediately.
   async function populateCameras(forcePermissionProbe) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
     try {
@@ -466,16 +472,54 @@
       }
     } catch (e) { /* ignore */ }
   }
+
+  async function populateMics(forcePermissionProbe) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      if (forcePermissionProbe) {
+        try {
+          const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+          probe.getTracks().forEach(t => t.stop());
+        } catch (e) { /* user may deny; fall through and enumerate what we can */ }
+      }
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const mics = devices.filter(d => d.kind === 'audioinput');
+      const select = $('micSelect');
+      const prevValue = select.value;
+      select.innerHTML = '';
+      if (!mics.length) {
+        select.innerHTML = '<option value="">マイクが見つかりません</option>';
+        return;
+      }
+      const labelsMissing = mics.some(d => !d.label);
+      mics.forEach((d, i) => {
+        const opt = document.createElement('option');
+        opt.value = d.deviceId;
+        opt.textContent = d.label || `マイク ${i + 1}（🔄で名前を取得）`;
+        select.appendChild(opt);
+      });
+      if (mics.some(d => d.deviceId === prevValue)) select.value = prevValue;
+      if (labelsMissing && !forcePermissionProbe) {
+        populateMics(true);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   populateCameras(false);
+  populateMics(false);
 
   $('btnRefreshCams').addEventListener('click', () => populateCameras(true));
+  $('btnRefreshMics').addEventListener('click', () => populateMics(true));
 
   let deviceChangeTimer = null;
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
     navigator.mediaDevices.addEventListener('devicechange', () => {
       // debounce + give the OS a moment to finish initializing a newly plugged device
       clearTimeout(deviceChangeTimer);
-      deviceChangeTimer = setTimeout(() => populateCameras(true), 600);
+      deviceChangeTimer = setTimeout(() => {
+        populateCameras(true);
+        populateMics(true);
+      }, 600);
     });
   }
 
@@ -521,6 +565,7 @@
     $('fpsSelect').disabled = locked;
     $('formatSelect').disabled = locked;
     $('cameraSelect').disabled = locked;
+    $('micSelect').disabled = locked;
     document.querySelectorAll('#sourceSeg button').forEach(b => b.disabled = locked || (!hasDisplayMedia && (b.dataset.mode !== 'webcam')));
     $('micToggle').disabled = locked;
     $('sysToggle').disabled = locked || (mode === 'webcam');
@@ -567,7 +612,11 @@
       });
     }
     if ($('micToggle').checked) {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      const micId = $('micSelect').value;
+      const audioConstraints = { echoCancellation: true, noiseSuppression: true };
+      if (micId) audioConstraints.deviceId = { exact: micId };
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
+      populateMics(); // labels become available once permission is granted
     }
   }
 
