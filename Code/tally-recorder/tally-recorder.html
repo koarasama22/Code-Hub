@@ -90,6 +90,14 @@
     outline: 1px solid #2a2c34;
   }
   .monitor.live{ outline-color: rgba(255,59,48,0.35); }
+  .monitor:fullscreen, .monitor:-webkit-full-screen{
+    width:100vw; height:100vh; aspect-ratio:auto; border-radius:0; outline:none;
+    background:#000;
+  }
+  .monitor:fullscreen video, .monitor:fullscreen canvas,
+  .monitor:-webkit-full-screen video, .monitor:-webkit-full-screen canvas{
+    width:100%; height:100%; object-fit:contain;
+  }
   .monitor video, .monitor canvas{
     width:100%; height:100%; object-fit:contain; display:block; background:#000;
   }
@@ -259,6 +267,7 @@
         <button id="btnPause" disabled>一時停止</button>
         <button id="btnStop" disabled>■ 停止</button>
         <button id="btnSnapshot" disabled>📷 静止画 (PNG)</button>
+        <button class="ghost" id="btnFullscreen" title="モニターをフルスクリーン">⛶ フル画面</button>
         <button class="ghost" id="btnReset">リセット</button>
       </div>
     </div>
@@ -327,7 +336,7 @@
           <span>マイク音声</span>
           <label class="switch"><input type="checkbox" id="micToggle"><span class="slider"></span></label>
         </div>
-        <div class="cam-row" id="micSelectRow" style="margin-top:8px; margin-bottom:8px;">
+        <div class="cam-row" id="micSelectRow" style="margin-top:8px; margin-bottom:8px; display:none;">
           <select id="micSelect">
             <option value="">既定のマイク</option>
           </select>
@@ -435,11 +444,6 @@
   updateCameraGroupVisibility();
 
   // ---- camera / mic device list ----
-  // Plain enumerateDevices() before/without a fresh permission grant often returns
-  // only one generic entry (privacy protection), which is why a newly plugged-in
-  // device can show up as a blank label. To get real labels we briefly open a
-  // throwaway stream (which forces the browser to resolve device labels), then
-  // close it immediately.
   async function populateCameras(forcePermissionProbe) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
     try {
@@ -467,7 +471,6 @@
       });
       if (cams.some(d => d.deviceId === prevValue)) select.value = prevValue;
       if (labelsMissing && !forcePermissionProbe) {
-        // labels not resolved yet — try once more with a permission probe
         populateCameras(true);
       }
     } catch (e) { /* ignore */ }
@@ -511,10 +514,17 @@
   $('btnRefreshCams').addEventListener('click', () => populateCameras(true));
   $('btnRefreshMics').addEventListener('click', () => populateMics(true));
 
+  // mic select visibility: show only when mic is enabled
+  function updateMicSelectVisibility() {
+    const on = $('micToggle').checked;
+    $('micSelectRow').style.display = on ? 'flex' : 'none';
+  }
+  $('micToggle').addEventListener('change', updateMicSelectVisibility);
+  updateMicSelectVisibility();
+
   let deviceChangeTimer = null;
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
     navigator.mediaDevices.addEventListener('devicechange', () => {
-      // debounce + give the OS a moment to finish initializing a newly plugged device
       clearTimeout(deviceChangeTimer);
       deviceChangeTimer = setTimeout(() => {
         populateCameras(true);
@@ -537,7 +547,7 @@
   }
   function estimateBitrate(w, h, fps) {
     const pixels = w * h;
-    const bpp = 0.08; // bits per pixel per frame, decent VP9 quality
+    const bpp = 0.08;
     let bitrate = pixels * fps * bpp;
     return Math.min(Math.round(bitrate), 100_000_000);
   }
@@ -601,7 +611,7 @@
       const camConstraints = Object.assign({}, videoConstraints);
       if (camId) camConstraints.deviceId = { exact: camId };
       webcamStream = await navigator.mediaDevices.getUserMedia({ video: camConstraints, audio: false });
-      populateCameras(); // labels become available once permission is granted
+      populateCameras();
     }
     if (mode === 'screen' || mode === 'both') {
       screenStream = await navigator.mediaDevices.getDisplayMedia({ video: videoConstraints, audio: $('sysToggle').checked });
@@ -616,14 +626,13 @@
       const audioConstraints = { echoCancellation: true, noiseSuppression: true };
       if (micId) audioConstraints.deviceId = { exact: micId };
       micStream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints });
-      populateMics(); // labels become available once permission is granted
+      populateMics();
     }
   }
 
   async function buildFinalStream() {
     finalStream = new MediaStream();
 
-    // video track
     if (mode === 'webcam') {
       previewVideo.style.display = 'block';
       previewCanvas.style.display = 'none';
@@ -649,7 +658,6 @@
       finalStream.addTrack(canvasStream.getVideoTracks()[0]);
     }
 
-    // audio mixing
     const audioSources = [];
     if (micStream && micStream.getAudioTracks().length) audioSources.push(micStream);
     if (screenStream && screenStream.getAudioTracks().length) audioSources.push(new MediaStream([screenStream.getAudioTracks()[0]]));
@@ -883,7 +891,7 @@
   }
   $('btnReset').disabled = true;
 
-  // ---- snapshot (works live or during recording) ----
+  // ---- snapshot ----
   let snapshotCounter = 0;
   $('btnSnapshot').addEventListener('click', () => captureSnapshot());
 
@@ -915,13 +923,34 @@
       setTimeout(() => URL.revokeObjectURL(url), 4000);
     }, 'image/png');
 
-    // shutter flash feedback
     const flash = $('flash');
     flash.classList.add('go');
     requestAnimationFrame(() => {
       flash.classList.remove('go');
     });
   }
+
+  // ---- fullscreen (monitor) ----
+  $('btnFullscreen').addEventListener('click', async () => {
+    const el = monitorEl;
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        if (document.exitFullscreen) await document.exitFullscreen();
+        else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+      } else {
+        if (el.requestFullscreen) await el.requestFullscreen();
+        else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      }
+    } catch (e) {
+      showError('フルスクリーンに切り替えられませんでした: ' + (e.message || e.name || e));
+    }
+  });
+  function updateFullscreenBtn() {
+    const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    $('btnFullscreen').textContent = on ? '⛶ 解除' : '⛶ フル画面';
+  }
+  document.addEventListener('fullscreenchange', updateFullscreenBtn);
+  document.addEventListener('webkitfullscreenchange', updateFullscreenBtn);
 
   window.addEventListener('beforeunload', () => cleanupSources());
 })();
