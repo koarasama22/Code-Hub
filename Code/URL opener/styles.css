@@ -1,0 +1,72 @@
+/* ===== 全体設定 ===== */
+body {
+  font-family: "Segoe UI", sans-serif;
+  background: #f0f2f5;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: 0.3s;
+}
+
+body.dark {
+  background: #1e1e1e;
+  color: white;
+}
+
+/* ===== アプリ本体（高さを可変にする） ===== */
+.app {
+  width: 100%;
+  max-width: 600px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* ===== 入力欄 ===== */
+input {
+  width: 100%;
+  padding: 12px;/*上下*/
+  font-size: 16px;/*文字の大きさ*/
+  border: 1px solid #ccc;/*枠線*/
+  border-radius: 10px;/**/
+  margin-bottom: 15px;/*ボタンまでの距離*/
+  transition: 0.2s;
+}
+
+input:focus {
+  border-color: #2196F3;
+  box-shadow: 0 0 5px rgba(33,150,243,0.5);
+  outline: none;
+}
+
+/* ===== ボタン ===== */
+.btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  color: white;
+  transition: 0.2s;
+}
+
+.inpage { background: #4CAF50; }
+.newtab { background: #2196F3; }
+.darkmode { background: #555; }
+
+/* ===== iframe（画面いっぱいに広げる） ===== */
+iframe {
+  width: 100%;
+  height: calc(100vh - 250px); /* 上のUI分を引く */
+  border: none;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+body.dark iframe {
+  background: #3a3a3a;
+}
