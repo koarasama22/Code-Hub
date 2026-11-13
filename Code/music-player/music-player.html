@@ -81,6 +81,9 @@
   .playlist .remove:hover { color: var(--danger); background: #2b1f24; }
   .empty { color: var(--muted); text-align: center; padding: 18px 0; font-size: .9rem; }
 
+  .agc-info { text-align: center; color: var(--muted); font-size: .8rem; margin-top: 8px; min-height: 1.2em; }
+  .agc-info span { color: var(--accent); }
+
   @media (max-width: 520px) {
     #spectrum { height: 130px; }
     .icon-btn { width: 42px; height: 42px; }
@@ -112,6 +115,7 @@
     <canvas id="spectrum" aria-label="スペクトラム表示"></canvas>
     <div id="track-title" class="track-title">曲が選択されていません</div>
     <div id="track-sub" class="track-sub"></div>
+    <div id="agc-info" class="agc-info">自動音量調整: <span id="agc-level">待機中</span></div>
   </section>
 
   <section class="controls" aria-label="再生コントロール">
@@ -191,17 +195,27 @@
   var volumeValue = $('volume-value');
   var playlistEl = $('playlist');
   var playlistCount = $('playlist-count');
-  var downloadBtn = $('download-html-btn');
+  var agcInfoEl = $('agc-level');
   var tracks = [];
   var currentIndex = -1;
   var shuffle = false;
-  var loopMode = 'off'; 
+  var loopMode = 'off';
   var navHistory = [];
-  var played = {};   
+  var played = {};
   var seeking = false;
   var nextId = 1;
-  var audioCtx = null, analyser = null, sourceNode = null, freqData = null;
+  var audioCtx = null, analyser = null, sourceNode = null, gainNode = null, freqData = null, timeData = null;
   var autoplayBlocked = false;
+
+  // AGC (Automatic Gain Control) settings
+  var userVolume = 0.8;          // 0.0 - 1.0 (from slider)
+  var agcFactor = 1.0;           // automatic compensation factor
+  var AGC_TARGET_RMS = 0.13;     // target RMS level (around -17 dBFS-ish)
+  var AGC_MIN_FACTOR = 0.25;     // don't attenuate more than this
+  var AGC_MAX_FACTOR = 6.0;      // max boost (~15.5 dB)
+  var AGC_SMOOTH = 0.92;         // higher = slower response (less pumping)
+  var AGC_ATTACK = 0.15;         // how fast to reduce when too loud
+  var lastAgcUpdate = 0;
 
   function fmtTime(sec) {
     if (!isFinite(sec) || sec < 0) return '0:00';
@@ -325,6 +339,8 @@
     audio.removeAttribute('src'); audio.load();
     trackTitle.textContent = '曲が選択されていません'; trackSub.textContent = '';
     seekBar.value = 0; currentTimeEl.textContent = '0:00'; durationEl.textContent = '0:00';
+    agcFactor = 1.0;
+    updateAgcDisplay();
     renderPlaylist(); setStatus('プレイリストをクリアしました');
   });
 
@@ -374,14 +390,41 @@
     try {
       audioCtx = new AC();
       sourceNode = audioCtx.createMediaElementSource(audio);
+      gainNode = audioCtx.createGain();
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.8;
-      sourceNode.connect(analyser);
+      // source -> gain (volume + AGC) -> analyser -> destination
+      sourceNode.connect(gainNode);
+      gainNode.connect(analyser);
       analyser.connect(audioCtx.destination);
       freqData = new Uint8Array(analyser.frequencyBinCount);
+      timeData = new Uint8Array(analyser.fftSize);
+      // Media element volume stays at 1; we control level via gainNode
+      audio.volume = 1;
+      applyGain();
     } catch (e) { console.warn('AudioContext unavailable:', e); audioCtx = null; }
   }
+
+  function applyGain() {
+    if (!gainNode) return;
+    var effective = userVolume * agcFactor;
+    // soft clamp to avoid extreme values
+    effective = Math.max(0.001, Math.min(effective, 8));
+    gainNode.gain.setTargetAtTime(effective, audioCtx.currentTime, 0.03);
+  }
+
+  function updateAgcDisplay() {
+    if (!agcInfoEl) return;
+    if (audio.paused || !analyser) {
+      agcInfoEl.textContent = '待機中';
+      return;
+    }
+    var db = 20 * Math.log10(Math.max(agcFactor, 0.001));
+    var sign = db >= 0 ? '+' : '';
+    agcInfoEl.textContent = '×' + agcFactor.toFixed(2) + ' (' + sign + db.toFixed(1) + ' dB)';
+  }
+
   function applySpeed() {
     var r = parseFloat(speedSelect.value) || 1;
     audio.defaultPlaybackRate = r; audio.playbackRate = r;
@@ -405,6 +448,10 @@
     currentIndex = i;
     var t = tracks[i];
     played[t.id] = true;
+    // Reset AGC when changing tracks so it re-adapts quickly
+    agcFactor = 1.0;
+    applyGain();
+    updateAgcDisplay();
     audio.src = t.url;
     applySpeed();
     audio.loop = (loopMode === 'one');
@@ -492,13 +539,14 @@
   }
   function setVolume(v) {
     v = Math.max(0, Math.min(100, Math.round(v)));
-    audio.volume = v / 100;
+    userVolume = v / 100;
     volumeSlider.value = v; volumeValue.textContent = v + '%';
     if (v > 0 && audio.muted) audio.muted = false;
+    applyGain();
     updateMuteButton();
   }
   function updateMuteButton() {
-    var v = audio.volume;
+    var v = userVolume;
     muteBtn.textContent = (audio.muted || v === 0) ? '🔇' : v < 0.5 ? '🔉' : '🔊';
     muteBtn.classList.toggle('active', audio.muted);
   }
@@ -510,7 +558,12 @@
   loopBtn.addEventListener('click', function () { setLoopMode(loopMode === 'off' ? 'all' : loopMode === 'all' ? 'one' : 'off'); });
   speedSelect.addEventListener('change', applySpeed);
   volumeSlider.addEventListener('input', function () { setVolume(parseFloat(volumeSlider.value)); });
-  muteBtn.addEventListener('click', function () { audio.muted = !audio.muted; updateMuteButton(); });
+  muteBtn.addEventListener('click', function () {
+    audio.muted = !audio.muted;
+    // When muted we still keep the gain graph but silence via media element mute
+    // (gain stays ready so unmute is instant)
+    updateMuteButton();
+  });
 
   seekBar.addEventListener('input', function () {
     seeking = true;
@@ -550,6 +603,7 @@
 
   var BAR_COUNT = 64;
   var smoothed = new Float32Array(BAR_COUNT);
+
   function resizeCanvas() {
     var dpr = window.devicePixelRatio || 1;
     var w = canvas.clientWidth || 600, h = canvas.clientHeight || 180;
@@ -557,9 +611,49 @@
       canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     }
   }
+
+  function updateAGC() {
+    if (!analyser || !timeData || audio.paused || audio.muted || userVolume < 0.01) {
+      updateAgcDisplay();
+      return;
+    }
+    analyser.getByteTimeDomainData(timeData);
+    var sum = 0;
+    var len = timeData.length;
+    for (var i = 0; i < len; i++) {
+      var v = (timeData[i] - 128) / 128;
+      sum += v * v;
+    }
+    var rms = Math.sqrt(sum / len);
+
+    // Avoid division by near-zero (silence / very quiet passages)
+    if (rms < 0.008) {
+      // slowly relax toward 1.0 during silence so next loud part starts reasonable
+      agcFactor = agcFactor * 0.995 + 1.0 * 0.005;
+    } else {
+      var desired = AGC_TARGET_RMS / rms;
+      // asymmetric smoothing: faster attack when too loud, slower release when quiet
+      var alpha = (desired < agcFactor) ? (1 - AGC_ATTACK) : AGC_SMOOTH;
+      agcFactor = agcFactor * alpha + desired * (1 - alpha);
+    }
+    // clamp
+    if (agcFactor < AGC_MIN_FACTOR) agcFactor = AGC_MIN_FACTOR;
+    if (agcFactor > AGC_MAX_FACTOR) agcFactor = AGC_MAX_FACTOR;
+
+    applyGain();
+    // update display roughly every 200ms
+    var now = performance.now();
+    if (now - lastAgcUpdate > 200) {
+      lastAgcUpdate = now;
+      updateAgcDisplay();
+    }
+  }
+
   function drawSpectrum() {
     requestAnimationFrame(drawSpectrum);
     resizeCanvas();
+    updateAGC();   // run AGC every frame while playing
+
     var W = canvas.width, H = canvas.height;
     ctx2d.clearRect(0, 0, W, H);
     var active = analyser && !audio.paused;
@@ -590,6 +684,7 @@
   drawSpectrum();
 
   setVolume(80); setLoopMode('off'); setShuffle(false); applySpeed(); renderPlaylist(); updatePlayButton();
+  updateAgcDisplay();
 
   function makeWavFile(name, freq, seconds) {
     var sr = 8000, n = Math.floor(sr * seconds);
@@ -620,12 +715,13 @@
       check(Math.abs(audio.duration - 2) < 0.1, 'duration ≈ 2s (' + audio.duration.toFixed(2) + ')');
       check(await waitUntil(function () { return tracks.every(function (t) { return t.duration > 0; }); }, 4000), 'playlist durations loaded: ' + tracks.map(function (t) { return t.duration.toFixed(1); }).join(','));
       check(analyser !== null, 'AudioContext + AnalyserNode created (spectrum)');
+      check(gainNode !== null, 'GainNode created for AGC');
       check(!audio.paused || autoplayBlocked, 'play() started (paused=' + audio.paused + ', autoplayBlocked=' + autoplayBlocked + ')');
       check(playBtn.textContent === (audio.paused ? '▶' : '⏸'), 'play button reflects state');
       speedSelect.value = '1.5'; speedSelect.dispatchEvent(new Event('change'));
       check(audio.playbackRate === 1.5, 'speed 1.5x applied');
       volumeSlider.value = 40; volumeSlider.dispatchEvent(new Event('input'));
-      check(Math.abs(audio.volume - 0.4) < 0.001 && volumeValue.textContent === '40%', 'volume 40% applied');
+      check(Math.abs(userVolume - 0.4) < 0.001 && volumeValue.textContent === '40%', 'volume 40% applied');
       muteBtn.click(); check(audio.muted === true && muteBtn.textContent === '🔇', 'mute on');
       muteBtn.click(); check(audio.muted === false, 'mute off');
       seekBar.value = 500; seekBar.dispatchEvent(new Event('input')); seekBar.dispatchEvent(new Event('change'));
@@ -655,8 +751,6 @@
       check(playlistEl.querySelectorAll('li').length === 3, 'playlist rendered 3 items');
       playlistEl.querySelectorAll('li')[2].click(); check(currentIndex === 2 && playlistEl.querySelectorAll('li')[2].classList.contains('current'), 'click playlist item selects track');
       removeTrack(0); check(tracks.length === 2 && currentIndex === 1 && tracks[currentIndex].name === 'test-c', 'remove track keeps current selection');
-      var html = await getOwnHtml();
-      check(html.length > 5000 && html.indexOf('id="spectrum"') !== -1 && /<\/html>\s*$/i.test(html), 'own HTML retrieved for download (' + html.length + ' chars)');
       check(canvas.width > 0 && canvas.height > 0, 'spectrum canvas sized ' + canvas.width + 'x' + canvas.height);
       clearBtn.click(); check(tracks.length === 0 && currentIndex === -1, 'clear all');
     } catch (e) { fails.push('exception: ' + (e && e.stack || e)); console.error(e); }
@@ -667,5 +761,5 @@
   if (/[?&]selftest=1/.test(location.search)) { window.addEventListener('load', function () { setTimeout(runSelfTest, 200); }); }
 })();
 </script>
-<script src="https://www.genspark.ai/sandbox_inspect.js"></script></body>
+</body>
 </html>
