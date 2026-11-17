@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+ <link rel="icon" href="Code/Mouse and Keyboard Recycling/Design.png" type="image/png">
+  <link rel="apple-touch-icon" href="Code/Mouse and Keyboard Recycling/Design.png" sizes="180x180">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>回収</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', 'Hiragino Sans', 'Meiryo', sans-serif;
+      background: #0f0f13;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+    }
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 8px;
+      color: #7dd3fc;
+    }
+    .status {
+      font-size: 0.95rem;
+      margin-bottom: 20px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: #1a1a24;
+      border: 1px solid #333;
+    }
+    .status.recording {
+      border-color: #22c55e;
+      color: #4ade80;
+    }
+    .status.stopped {
+      border-color: #ef4444;
+      color: #f87171;
+    }
+    .status.locked {
+      border-color: #f59e0b;
+      color: #fbbf24;
+    }
+    .info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      width: 100%;
+      max-width: 720px;
+      margin-bottom: 20px;
+    }
+    .card {
+      background: #1a1a24;
+      border: 1px solid #2a2a38;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .value {
+      font-size: 1.4rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      color: #f1f5f9;
+    }
+    .log-area {
+      width: 100%;
+      max-width: 720px;
+      background: #1a1a24;
+      border: 1px solid #2a2a38;
+      border-radius: 12px;
+      padding: 16px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 280px;
+    }
+    .log-area h2 {
+      font-size: 0.9rem;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+    #log {
+      flex: 1;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #cbd5e1;
+    }
+    .key {
+      display: inline-block;
+      background: #334155;
+      color: #f8fafc;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin: 1px 2px;
+      font-size: 0.8rem;
+    }
+    .hint {
+      margin-top: 16px;
+      font-size: 0.85rem;
+      color: #64748b;
+      text-align: center;
+    }
+    .buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn {
+      padding: 8px 18px;
+      background: #1e293b;
+      border: 1px solid #475569;
+      color: #e2e8f0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .btn:hover {
+      background: #334155;
+    }
+    .btn.white {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #cbd5e1;
+    }
+    .btn.white:hover {
+      background: #e2e8f0;
+    }
+    .btn.lock {
+      background: #f59e0b;
+      color: #0f172a;
+      border-color: #d97706;
+      font-weight: 600;
+    }
+    .btn.lock:hover {
+      background: #fbbf24;
+    }
+    #whiteOverlay {
+      position: fixed;
+      inset: 0;
+      background: #ffffff;
+      z-index: 99999;
+      display: none;
+      cursor: none;
+    }
+    #whiteOverlay.active {
+      display: block;
+    }
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 20px;
+      height: 20px;
+      margin: -10px 0 0 -10px;
+      pointer-events: none;
+      z-index: 1000;
+      display: none;
+    }
+    #crosshair::before,
+    #crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(125, 211, 252, 0.8);
+    }
+    #crosshair::before {
+      width: 2px;
+      height: 100%;
+      left: 9px;
+      top: 0;
+    }
+    #crosshair::after {
+      height: 2px;
+      width: 100%;
+      top: 9px;
+      left: 0;
+    }
+    #crosshair.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>回収</h1>
+  <div id="status" class="status recording">● 記録中 — 「カーソルロック」ボタンでロック開始</div>
+
+  <div class="info">
+    <div class="card">
+      <h2>マウス移動量 (ロック中)</h2>
+      <div class="value" id="mousePos">ΔX: ---  ΔY: ---</div>
+    </div>
+    <div class="card">
+      <h2>最後に押したキー</h2>
+      <div class="value" id="lastKey">—</div>
+    </div>
+  </div>
+
+  <div class="log-area">
+    <h2>記録ログ</h2>
+    <div id="log"></div>
+  </div>
+  <div class="buttons">
+    <button class="btn lock" id="lockBtn">カーソルロック開始</button>
+    <button class="btn" id="clearBtn">ログをクリア</button>
+    <button class="btn white" id="whiteBtn">真っ白にする</button>
+  </div>
+  <div id="whiteOverlay"></div>
+  <div id="crosshair"></div>
+  <script>
+    const statusEl = document.getElementById('status');
+    const mousePosEl = document.getElementById('mousePos');
+    const lastKeyEl = document.getElementById('lastKey');
+    const logEl = document.getElementById('log');
+    const clearBtn = document.getElementById('clearBtn');
+    const whiteBtn = document.getElementById('whiteBtn');
+    const lockBtn = document.getElementById('lockBtn');
+    const whiteOverlay = document.getElementById('whiteOverlay');
+    const crosshair = document.getElementById('crosshair');
+    let recording = true;
+    let isLocked = false;
+    let isWhite = false;
+    let keyCount = 0;
+    let moveCount = 0;
+    let totalDX = 0;
+    let totalDY = 0;
+
+    function addLog(text) {
+      const time = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+      logEl.innerHTML += `[${time}] ${text}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateStatus() {
+      statusEl.classList.remove('recording', 'stopped', 'locked');
+      if (isLocked) {
+        statusEl.textContent = '🔒 カーソルロック中 — ESCで解除';
+        statusEl.classList.add('locked');
+      } else if (recording) {
+        statusEl.textContent = '● 記録中 — 「カーソルロック」ボタンでロック開始';
+        statusEl.classList.add('recording');
+      } else {
+        statusEl.textContent = '■ 停止しました';
+        statusEl.classList.add('stopped');
+      }
+    }
+    function stopRecording() {
+      if (!recording) return;
+      recording = false;
+      if (document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+      updateStatus();
+      addLog('<span style="color:#f87171">=== 記録終了 ===</span>');
+    }
+    function showWhite() {
+      isWhite = true;
+      whiteOverlay.classList.add('active');
+      addLog('<span style="color:#94a3b8">画面を真っ白にしました</span>');
+    }
+    function hideWhite() {
+      if (!isWhite) return;
+      isWhite = false;
+      whiteOverlay.classList.remove('active');
+      addLog('<span style="color:#94a3b8">真っ白画面を解除しました</span>');
+    }
+    function startPointerLock() {
+      if (!recording) {
+        addLog('<span style="color:#f87171">記録が停止中のためロックできません</span>');
+        return;
+      }
+      document.body.requestPointerLock();
+    }
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement) {
+        isLocked = true;
+        crosshair.classList.add('active');
+        totalDX = 0;
+        totalDY = 0;
+        mousePosEl.textContent = 'ΔX: 0  ΔY: 0';
+        updateStatus();
+        addLog('<span style="color:#fbbf24">🔒 カーソルをロックしました（ESCで解除）</span>');
+      } else {
+        isLocked = false;
+        crosshair.classList.remove('active');
+        updateStatus();
+        addLog('<span style="color:#94a3b8">カーソルロックを解除しました</span>');
+        if (recording) {
+          stopRecording();
+        }
+      }
+    });
+    document.addEventListener('pointerlockerror', () => {
+      addLog('<span style="color:#f87171">ポインターロックに失敗しました</span>');
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!recording) return;
+
+      if (isLocked) {
+        totalDX += e.movementX;
+        totalDY += e.movementY;
+        mousePosEl.textContent = `ΔX: ${totalDX}  ΔY: ${totalDY}`;
+        moveCount++;
+        if (moveCount % 30 === 0) {
+          addLog(`移動量 → ΔX: ${e.movementX}, ΔY: ${e.movementY} (累計 ΔX:${totalDX} ΔY:${totalDY})`);
+        }
+      } else if (!isWhite) {
+        mousePosEl.textContent = `X: ${e.clientX}  Y: ${e.clientY}`;
+      }
+    });
+    document.addEventListener('mousedown', (e) => {
+      if (isWhite) {
+        e.preventDefault();
+        hideWhite();
+        return;
+      }
+      if (!recording) return;
+      const btn = ['左', '中', '右'][e.button] || e.button;
+      addLog(`マウスクリック: ${btn}ボタン`);
+    });
+    document.addEventListener('keydown', (e) => {
+      if (isWhite) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          hideWhite();
+        }
+        return;
+      }
+      if (!recording) return;
+      if (e.key === 'ArrowUp' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        showWhite();
+        return;
+      }
+      if (e.key === 'Escape') return;
+      keyCount++;
+      const keyLabel = e.key === ' ' ? 'Space' : e.key;
+      lastKeyEl.innerHTML = `<span class="key">${keyLabel}</span>`;
+      let info = `キー: <span class="key">${keyLabel}</span>`;
+      if (e.ctrlKey) info += ' +Ctrl';
+      if (e.altKey) info += ' +Alt';
+      if (e.shiftKey) info += ' +Shift';
+      if (e.metaKey) info += ' +Meta';
+      info += ` (code: ${e.code})`;
+      addLog(info);
+    });
+    lockBtn.addEventListener('click', () => {
+      startPointerLock();
+    });
+    clearBtn.addEventListener('click', () => {
+      logEl.innerHTML = '';
+      keyCount = 0;
+      moveCount = 0;
+      totalDX = 0;
+      totalDY = 0;
+      if (recording) {
+        addLog('ログをクリアしました。記録継続中…');
+      } else {
+        addLog('ログをクリアしました。');
+      }
+    });
+    whiteBtn.addEventListener('click', () => {
+      showWhite();
+    });
+    addLog('準備完了。「カーソルロック開始」ボタンを押してください。');
+    addLog('ロック中はマウスが画面内に固定され、ESCで解除されます。');
+  </script>
+</body>
+</html>
