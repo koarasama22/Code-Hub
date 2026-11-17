@@ -34,7 +34,6 @@
       line-height: 1.5;
     }
 
-    /* Animated background */
     body::before {
       content: "";
       position: fixed;
@@ -93,8 +92,6 @@
     .stat strong {
       color: var(--accent2);
     }
-
-    /* Search & Filter */
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -162,8 +159,6 @@
       border-color: var(--accent);
       color: white;
     }
-
-    /* Grid */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -246,8 +241,6 @@
       color: var(--muted);
       font-size: 0.85rem;
     }
-
-    /* Responsive */
     @media (max-width: 600px) {
       .container { padding: 1.25rem 1rem 3rem; }
       .grid { grid-template-columns: 1fr; }
@@ -289,7 +282,6 @@
 
   <script>
     const items = [
-      // Games
       {
         title: "2048",
         desc: "クラシックな数字合わせパズル。矢印キーでスライドして2048を目指そう。",
@@ -426,8 +418,6 @@
         category: "game",
         tags: ["体験"]
       },
-
-      // Racing
       {
         title: "HexGL",
         desc: "本格的な3D未来型レーシングゲーム。WebGL製の本格作。",
@@ -444,8 +434,6 @@
         category: "racing",
         tags: ["レーシング"]
       },
-
-      // Tools
       {
         title: "Music Player",
         desc: "シンプルで使いやすい音楽プレイヤー。",
@@ -517,7 +505,7 @@
         icon: "🔐",
         category: "tool",
         tags: ["セキュリティ"]
-      }
+      },
       {
         title: "Mouse and Keyboard Recycling",
         desc: "キーボードとマイスを回収するツール。",
@@ -525,7 +513,7 @@
         icon: "🪢",
         category: "tool",
         tags: ["セキュリティ"]
-     }
+     },
      {
         title: "Webcam Recording",
         desc: "Webカメラの音声をmp3で保存する。",
@@ -533,7 +521,7 @@
         icon: "📹",
         category: "tool",
         tags: ["ツール"]
-      }
+      },
       {
         title: "Camera OCR",
         desc: "カメラの文字をテキスト化する。",
