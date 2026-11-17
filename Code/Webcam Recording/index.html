@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webカメラ音声録音 → MP3</title>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --border: #2d3a4f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      line-height: 1.5;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 28px;
+      text-align: center;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #0f1419;
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 20px;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      cursor: pointer;
+    }
+    select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .preview-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+    }
+    #preview {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .preview-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+      background: #111;
+    }
+    .controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    button {
+      flex: 1;
+      min-width: 120px;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    #startBtn {
+      background: var(--accent);
+      color: white;
+    }
+    #startBtn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+    #stopBtn {
+      background: var(--danger);
+      color: white;
+    }
+    #stopBtn:hover:not(:disabled) {
+      background: #dc2626;
+    }
+    #downloadBtn {
+      background: var(--success);
+      color: white;
+      width: 100%;
+    }
+    #downloadBtn:hover:not(:disabled) {
+      background: #16a34a;
+    }
+    .status {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--muted);
+      min-height: 1.4em;
+      margin-bottom: 12px;
+    }
+    .status.recording {
+      color: var(--danger);
+      font-weight: 600;
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    .timer {
+      font-variant-numeric: tabular-nums;
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+    .info {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 20px;
+      line-height: 1.6;
+    }
+    .error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Webカメラ音声録音</h1>
+  <p class="subtitle">カメラを選んで録音し、MP3としてダウンロード</p>
+
+  <div class="card">
+    <div id="errorBox" class="error"></div>
+
+    <label for="cameraSelect">カメラを選択</label>
+    <select id="cameraSelect">
+      <option value="">カメラを読み込み中...</option>
+    </select>
+
+    <div class="preview-wrap">
+      <video id="preview" autoplay muted playsinline></video>
+      <div id="placeholder" class="preview-placeholder">カメラプレビュー</div>
+    </div>
+
+    <div class="timer" id="timer">00:00</div>
+    <div class="status" id="status">準備完了</div>
+
+    <div class="controls">
+      <button id="startBtn" disabled>
+        <span>●</span> 録音開始
+      </button>
+      <button id="stopBtn" disabled>
+        <span>■</span> 停止
+      </button>
+    </div>
+
+    <button id="downloadBtn" disabled style="display:none;">
+      MP3をダウンロード
+    </button>
+  </div>
+
+  <p class="info">
+    ※ マイク権限が必要です。録音データはすべてブラウザ内で処理され、サーバーには送信されません。<br>
+    ※ MP3変換には数秒かかる場合があります。
+  </p>
+
+  <script>
+    const cameraSelect = document.getElementById('cameraSelect');
+    const preview = document.getElementById('preview');
+    const placeholder = document.getElementById('placeholder');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusEl = document.getElementById('status');
+    const timerEl = document.getElementById('timer');
+    const errorBox = document.getElementById('errorBox');
+
+    let currentStream = null;
+    let mediaRecorder = null;
+    let recordedChunks = [];
+    let mp3Blob = null;
+    let timerInterval = null;
+    let seconds = 0;
+    let isRecording = false;
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+    }
+    function clearError() {
+      errorBox.style.display = 'none';
+      errorBox.textContent = '';
+    }
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60).toString().padStart(2, '0');
+      const sec = (s % 60).toString().padStart(2, '0');
+      return `${m}:${sec}`;
+    }
+
+    function startTimer() {
+      seconds = 0;
+      timerEl.textContent = '00:00';
+      timerInterval = setInterval(() => {
+        seconds++;
+        timerEl.textContent = formatTime(seconds);
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    async function getDevices() {
+      try {
+        // 権限を先に取得してラベルを表示可能にする
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        tempStream.getTracks().forEach(t => t.stop());
+
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(d => d.kind === 'videoinput');
+
+        cameraSelect.innerHTML = '';
+        if (cameras.length === 0) {
+          cameraSelect.innerHTML = '<option value="">カメラが見つかりません</option>';
+          showError('利用可能なカメラがありません。');
+          return;
+        }
+
+        cameras.forEach((cam, i) => {
+          const opt = document.createElement('option');
+          opt.value = cam.deviceId;
+          opt.textContent = cam.label || `カメラ ${i + 1}`;
+          cameraSelect.appendChild(opt);
+        });
+
+        // 最初のカメラでプレビュー開始
+        await startPreview(cameras[0].deviceId);
+        startBtn.disabled = false;
+      } catch (err) {
+        console.error(err);
+        showError('カメラ／マイクへのアクセスが拒否されました。ブラウザの設定を確認してください。');
+        cameraSelect.innerHTML = '<option value="">アクセス拒否</option>';
+      }
+    }
+
+    async function startPreview(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach(t => t.stop());
+        currentStream = null;
+      }
+
+      try {
+        const constraints = {
+          video: deviceId ? { deviceId: { exact: deviceId } } : true,
+          audio: true
+        };
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        preview.srcObject = currentStream;
+        placeholder.style.display = 'none';
+        clearError();
+      } catch (err) {
+        console.error(err);
+        showError('選択したカメラを開けませんでした: ' + err.message);
+        placeholder.style.display = 'flex';
+      }
+    }
+
+    cameraSelect.addEventListener('change', () => {
+      if (!isRecording) {
+        startPreview(cameraSelect.value);
+      }
+    });
+
+    startBtn.addEventListener('click', async () => {
+      if (!currentStream) {
+        showError('カメラが準備できていません。');
+        return;
+      }
+
+      clearError();
+      recordedChunks = [];
+      mp3Blob = null;
+      downloadBtn.style.display = 'none';
+      downloadBtn.disabled = true;
+
+      // 音声トラックのみ録音
+      const audioTracks = currentStream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        showError('音声トラックがありません。マイクが接続されているか確認してください。');
+        return;
+      }
+
+      const audioStream = new MediaStream(audioTracks);
+
+      try {
+        // 対応するMIMEを探す
+        const mimeTypes = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/ogg;codecs=opus',
+          'audio/ogg',
+          'audio/mp4'
+        ];
+        let mimeType = '';
+        for (const t of mimeTypes) {
+          if (MediaRecorder.isTypeSupported(t)) {
+            mimeType = t;
+            break;
+          }
+        }
+
+        mediaRecorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          statusEl.textContent = 'MP3に変換中...';
+          statusEl.classList.remove('recording');
+          try {
+            const webmBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+            mp3Blob = await convertToMp3(webmBlob);
+            statusEl.textContent = '変換完了！ダウンロードできます';
+            downloadBtn.style.display = 'block';
+            downloadBtn.disabled = false;
+          } catch (err) {
+            console.error(err);
+            showError('MP3変換に失敗しました: ' + err.message);
+            statusEl.textContent = 'エラーが発生しました';
+          }
+        };
+
+        mediaRecorder.start(1000); // 1秒ごとにチャンク
+        isRecording = true;
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        cameraSelect.disabled = true;
+        statusEl.textContent = '録音中...';
+        statusEl.classList.add('recording');
+        startTimer();
+      } catch (err) {
+        console.error(err);
+        showError('録音を開始できませんでした: ' + err.message);
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      isRecording = false;
+      stopBtn.disabled = true;
+      startBtn.disabled = false;
+      cameraSelect.disabled = false;
+      stopTimer();
+      statusEl.classList.remove('recording');
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      if (!mp3Blob) return;
+      const url = URL.createObjectURL(mp3Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const now = new Date();
+      const name = `recording_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}.mp3`;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
+
+    // WebM/Opus → PCM → MP3 (lamejs)
+    async function convertToMp3(blob) {
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+      const channels = Math.min(audioBuffer.numberOfChannels, 2);
+      const sampleRate = audioBuffer.sampleRate;
+      const left = audioBuffer.getChannelData(0);
+      const right = channels > 1 ? audioBuffer.getChannelData(1) : null;
+
+      // Float32 → Int16
+      function floatTo16BitPCM(float32Array) {
+        const int16 = new Int16Array(float32Array.length);
+        for (let i = 0; i < float32Array.length; i++) {
+          const s = Math.max(-1, Math.min(1, float32Array[i]));
+          int16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        return int16;
+      }
+
+      const leftInt16 = floatTo16BitPCM(left);
+      const rightInt16 = right ? floatTo16BitPCM(right) : null;
+
+      const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+      const mp3Data = [];
+      const blockSize = 1152;
+
+      for (let i = 0; i < leftInt16.length; i += blockSize) {
+        const leftChunk = leftInt16.subarray(i, i + blockSize);
+        let mp3buf;
+        if (channels === 2 && rightInt16) {
+          const rightChunk = rightInt16.subarray(i, i + blockSize);
+          mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+        } else {
+          mp3buf = mp3encoder.encodeBuffer(leftChunk);
+        }
+        if (mp3buf.length > 0) {
+          mp3Data.push(mp3buf);
+        }
+      }
+
+      const end = mp3encoder.flush();
+      if (end.length > 0) {
+        mp3Data.push(end);
+      }
+
+      await audioCtx.close();
+      return new Blob(mp3Data, { type: 'audio/mp3' });
+    }
+
+    // 初期化
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError('このブラウザはカメラ／マイクに対応していません。');
+    } else {
+      getDevices();
+    }
+
+    // デバイス変更時に再取得
+    navigator.mediaDevices?.addEventListener('devicechange', () => {
+      if (!isRecording) getDevices();
+    });
+  </script>
+</body>
+</html>
