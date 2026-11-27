@@ -56,11 +56,11 @@
     align-items: flex-start;
   }
   .qr {
-    width: 112px;
-    height: 112px;
+    width: 148px;
+    height: 148px;
     background: #fff;
     flex-shrink: 0;
-    padding: 6px;
+    padding: 16px;
   }
   .qr canvas {
     display: block;
@@ -88,7 +88,7 @@
     <div class="progress"><span id="percent">0</span>% 完了</div>
     <div class="qr-area">
       <div class="qr">
-        <canvas id="qrCanvas" width="25" height="25"></canvas>
+        <canvas id="qrCanvas" width="116" height="116"></canvas>
       </div>
       <div class="info">
         この問題と可能な解決方法の詳細については、<br>
@@ -104,68 +104,54 @@
 
   <script>
     (function () {
-      const size = 25; 
+      // 実在するQRコード: https://www.windows.com/stopcode
+      const QR_DATA = [
+        "11111110000111110111101111111",
+        "10000010000001111000101000001",
+        "10111010110011010001101011101",
+        "10111010110000110111001011101",
+        "10111010110110011111101011101",
+        "10000010110010000100101000001",
+        "11111110101010101010101111111",
+        "00000000110010101001000000000",
+        "10111110001000001100001111100",
+        "10101000101111110001101110001",
+        "00000011101001111110000000000",
+        "11101001000101010001101101010",
+        "00000110000000110101000001100",
+        "10010001110110011001011010001",
+        "01110110100100000000111101100",
+        "00001101010010101011000110010",
+        "01001011011000000100100101100",
+        "11111001000001110111111110101",
+        "10011011101101111100101100100",
+        "10000100100101011001111110010",
+        "10001011100000110100111110111",
+        "00000000111010001001100011111",
+        "11111110001100010011101011100",
+        "10000010111100111011100010010",
+        "10111010111110010100111110110",
+        "10111010111100101011100101111",
+        "10111010101101011111111111110",
+        "10000010000000101000100101010",
+        "11111110101110000101010111100"
+      ];
+
       const canvas = document.getElementById('qrCanvas');
       const ctx = canvas.getContext('2d');
-      const modules = Array.from({ length: size }, () => Array(size).fill(false));
-      function rand() {
-        return Math.random() < 0.48;
-      }
-      function placeFinder(x, y) {
-        for (let dy = 0; dy < 7; dy++) {
-          for (let dx = 0; dx < 7; dx++) {
-            const isBorder = dx === 0 || dx === 6 || dy === 0 || dy === 6;
-            const isCenter = dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4;
-            modules[y + dy][x + dx] = isBorder || isCenter;
-          }
-        }
-      }
+      const size = QR_DATA.length;
+      const SCALE = 4; // 1モジュール = 4px（等倍表示のため整数）
 
-      function placeTiming() {
-        for (let i = 8; i < size - 8; i++) {
-          modules[6][i] = i % 2 === 0;
-          modules[i][6] = i % 2 === 0;
-        }
-      }
+      canvas.width = size * SCALE;
+      canvas.height = size * SCALE;
 
-      function fillRandom() {
-        for (let y = 0; y < size; y++) {
-          for (let x = 0; x < size; x++) {
-            if ((x < 8 && y < 8) || (x > size - 9 && y < 8) || (x < 8 && y > size - 9)) continue;
-            if (x === 6 || y === 6) continue;
-            modules[y][x] = rand();
-          }
-        }
-      }
-
-      function clearSeparators() {
-        for (let i = 0; i < 8; i++) {
-          modules[7][i] = false;
-          modules[i][7] = false;
-        }
-        for (let i = 0; i < 8; i++) {
-          modules[7][size - 1 - i] = false;
-          modules[i][size - 8] = false;
-        }
-        for (let i = 0; i < 8; i++) {
-          modules[size - 8][i] = false;
-          modules[size - 1 - i][7] = false;
-        }
-      }
-
-      placeFinder(0, 0);
-      placeFinder(size - 7, 0);
-      placeFinder(0, size - 7);
-      placeTiming();
-      fillRandom();
-      clearSeparators();
       ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, size, size);
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#000';
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
-          if (modules[y][x]) {
-            ctx.fillRect(x, y, 1, 1);
+          if (QR_DATA[y][x] === '1') {
+            ctx.fillRect(x * SCALE, y * SCALE, SCALE, SCALE);
           }
         }
       }
